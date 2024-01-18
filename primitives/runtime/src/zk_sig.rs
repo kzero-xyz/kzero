@@ -28,20 +28,27 @@ impl Default for ZkLoginEnv {
 }
 
 #[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
-pub struct Signature {
+pub struct Signature<S> {
     source: JwkId,
     input: ZkLoginInputs,
     max_epoch: u64,
     // todo: remove eph_pubkey
     eph_pubkey_bytes: [u8; EPH_PUB_KEY_LEN],
-    sig: MultiSignature,
+    sig: S,
 }
 
-impl Verify for Signature {
-    type Signer = MultiSigner;
+impl<S> Verify for Signature<S>
+where
+    S: Verify,
+    S::Signer: IdentifyAccount<AccountId = AccountId32>,
+{
+    type Signer = S::Signer;
 
-    fn verify<L: Lazy<[u8]>>(&self, mut msg: L, signer: &AccountId32) -> bool {
-
+    fn verify<L: Lazy<[u8]>>(
+        &self,
+        mut msg: L,
+        signer: &<Self::Signer as IdentifyAccount>::AccountId,
+    ) -> bool {
         // check the validity of signer
         let address_seed = self.input.get_address_seed();
         let s: [u8; 32] = address_seed.into();
@@ -56,37 +63,13 @@ impl Verify for Signature {
             let mut d = [0_u8; 32];
             d.copy_from_slice(&self.eph_pubkey_bytes[1..]);
             d.into()
-
         } else {
             todo!("unimpl");
         };
 
-        match (&self.sig, &pub_key) {
-            (MultiSignature::Ed25519(ref sig), who) => {
-                match ed25519::Public::from_slice(who.as_ref()) {
-                    Ok(signer) => sig.verify(msg, &signer),
-                    Err(()) => false,
-                }
-            }
-
-            (MultiSignature::Sr25519(ref sig), who) => {
-                match sr25519::Public::from_slice(who.as_ref()) {
-                    Ok(signer) => sig.verify(msg, &signer),
-                    Err(()) => false,
-                }
-            }
-
-            (MultiSignature::Ecdsa(ref sig), who) => {
-                let m = sp_io::hashing::blake2_256(msg.get());
-                match sp_io::crypto::secp256k1_ecdsa_recover_compressed(sig.as_ref(), &m) {
-                    Ok(pubkey) => {
-                        &sp_io::hashing::blake2_256(pubkey.as_ref())
-                            == <dyn AsRef<[u8; 32]>>::as_ref(who)
-                    }
-                    _ => false,
-                }
-            }
-        };
+        if !self.sig.verify(msg, &pub_key) {
+            return false
+        }
 
         // verify zk proof
         verify_zk_login(
@@ -95,8 +78,8 @@ impl Verify for Signature {
             self.max_epoch,
             &self.eph_pubkey_bytes,
             &ZkLoginEnv::Prod,
-        ).is_ok()
-
+        )
+        .is_ok()
     }
 }
 

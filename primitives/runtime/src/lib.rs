@@ -14,7 +14,7 @@ use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::crypto::AccountId32;
 use sp_runtime::{
-    traits::{Lazy, Verify},
+    traits::{IdentifyAccount, Lazy, Verify},
     MultiSignature, MultiSigner, RuntimeDebug,
 };
 
@@ -25,16 +25,24 @@ pub const EPH_PUB_KEY_LEN: usize = 33;
 
 /// Wrapped MultiSignature that is compatible with Substrate
 #[derive(Eq, PartialEq, Clone, Encode, Decode, MaxEncodedLen, RuntimeDebug, TypeInfo)]
-pub enum ZkMultiSignature {
+pub enum ZkMultiSignature<S> {
     /// The MultiSignature that is original in substrate
-    Origin(MultiSignature),
+    Origin(S),
     /// The Signature that designed for zkLogin
-    Zk(zk_sig::Signature),
+    Zk(zk_sig::Signature<S>),
 }
 
-impl Verify for ZkMultiSignature {
-    type Signer = MultiSigner;
-    fn verify<L: Lazy<[u8]>>(&self, mut msg: L, signer: &AccountId32) -> bool {
+impl<S> Verify for ZkMultiSignature<S>
+where
+    S: Verify,
+    S::Signer: IdentifyAccount<AccountId = AccountId32>,
+{
+    type Signer = S::Signer;
+    fn verify<L: Lazy<[u8]>>(
+        &self,
+        msg: L,
+        signer: &<Self::Signer as IdentifyAccount>::AccountId,
+    ) -> bool {
         match self {
             ZkMultiSignature::Origin(s) => s.verify(msg, signer),
             ZkMultiSignature::Zk(zk_sig) => zk_sig.verify(msg, signer),
