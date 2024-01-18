@@ -4784,6 +4784,7 @@ dependencies = [
  "sp-transaction-pool",
  "sp-version",
  "substrate-wasm-builder",
+ "zklogin-runtime",
 ]
 
 [[package]]
@@ -6112,29 +6113,6 @@ checksum = "c247d24e63230cdb56463ae328478bd5eac8b8faa8c69461a77e8e323afac90e"
 dependencies = [
  "libc",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "runtime"
-version = "0.1.0"
-dependencies = [
- "ark-bn254",
- "ark-crypto-primitives",
- "ark-ff",
- "ark-groth16",
- "ark-relations",
- "base64ct",
- "ff",
- "num-bigint 0.4.4",
- "parity-scale-codec",
- "poseidon-ark",
- "scale-info",
- "serde",
- "serde_json",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.5.0)",
 ]
 
 [[package]]
@@ -10283,6 +10261,28 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.48",
+]
+
+[[package]]
+name = "zklogin-runtime"
+version = "0.1.0"
+dependencies = [
+ "ark-bn254",
+ "ark-crypto-primitives",
+ "ark-ff",
+ "ark-groth16",
+ "ark-relations",
+ "base64ct",
+ "ff",
+ "num-bigint 0.4.4",
+ "parity-scale-codec",
+ "poseidon-ark",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.5.0)",
 ]
 
 [[package]]

@@ -1,12 +1,10 @@
 [package]
-name = "runtime"
+name = "zklogin-runtime"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
 repository.workspace = true
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 ark-bn254 = { version = "0.4.0", default-features = false, features = ["curve"] }
@@ -21,11 +19,10 @@ poseidon-ark = { git = "https://github.com/dejavukong/poseidon-ark", branch = "n
 scale-codec = { workspace = true, default-features = false, features = ["derive"] }
 scale-info = { workspace = true, default-features = false, features = ["derive"] }
 serde = { workspace = true, optional = true }
-serde_json = { version = "1.0.111", default-features = false, features = ["alloc"] }
-sp-core = { workspace = true, default-features = false }
-sp-io = { workspace = true, default-features = false }
-sp-runtime = { workspace = true, default-features = false }
-sp-std = { workspace = true, default-features = false }
+sp-core = { workspace = true }
+sp-io = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
 
 [features]
 runtime-benchmarks = [
@@ -37,7 +34,6 @@ try-runtime = [
 default = ["std"]
 std = [
     "serde/std",
-    "serde_json/std",
     "scale-codec/std",
     "scale-info/std",
     "sp-runtime/std",

@@ -9,9 +9,6 @@ use ark_bn254::Bn254;
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::{Groth16, Proof};
 pub use base64ct::{Base64UrlUnpadded, Encoding};
-use sp_core::{crypto::ByteArray, ed25519, sr25519};
-
-const ZK_SIG_MAX_LENGTH: u32 = 65;
 
 #[derive(Debug, Clone)]
 pub enum ZkLoginEnv {

@@ -15,7 +15,7 @@ use scale_info::TypeInfo;
 use sp_core::crypto::AccountId32;
 use sp_runtime::{
     traits::{IdentifyAccount, Lazy, Verify},
-    MultiSignature, MultiSigner, RuntimeDebug,
+    RuntimeDebug,
 };
 
 use error::ZkAuthError;
