@@ -1,0 +1,65 @@
+[package]
+name = "runtime"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ark-bn254 = { version = "0.4.0", default-features = false, features = ["curve"] }
+ark-crypto-primitives = { version = "=0.4.0", default-features = false }
+ark-ff = { version = "0.4.1", default-features = false, features = ["asm"] }
+ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", default-features = false }
+ark-relations = { version = "0.4.0", default-features = false }
+base64ct = { version = "1.5.3", features = ["alloc"] }
+ff = { version = "0.13.0", default-features = false, features = ["derive"] }
+num-bigint = { version = "0.4.4", default-features = false }
+poseidon-ark = { git = "https://github.com/dejavukong/poseidon-ark", branch = "no-std", default-features = false }
+scale-codec = { workspace = true, default-features = false, features = ["derive"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+serde = { workspace = true, optional = true }
+serde_json = { version = "1.0.111", default-features = false, features = ["alloc"] }
+sp-core = { workspace = true, default-features = false }
+sp-io = { workspace = true, default-features = false }
+sp-runtime = { workspace = true, default-features = false }
+sp-std = { workspace = true, default-features = false }
+
+[features]
+runtime-benchmarks = [
+    "sp-runtime/runtime-benchmarks",
+]
+try-runtime = [
+    "sp-runtime/try-runtime",
+]
+default = ["std"]
+std = [
+    "serde/std",
+    "serde_json/std",
+    "scale-codec/std",
+    "scale-info/std",
+    "sp-runtime/std",
+    "sp-core/std",
+    "sp-io/std",
+    "sp-std/std",
+    # zk
+    "ark-crypto-primitives/std",
+    "ark-groth16/std",
+    "ark-bn254/std",
+    "ark-relations/std",
+    "ff/std",
+    "ark-ff/std",
+    "poseidon-ark/std",
+    "base64ct/std",
+    "num-bigint/std",
+]
+
+# Serde support without relying on std features.
+serde = [
+    "dep:serde",
+    "scale-info/serde",
+    "sp-core/serde",
+    "sp-runtime/serde",
+]

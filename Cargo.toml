@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "node",
+    "primitives/runtime",
     "runtime",
 ]
 resolver = "2"
@@ -15,6 +16,7 @@ repository = "https://github.com/alt-research/multi-seq"
 [workspace.dependencies]
 scale-codec = { package = "parity-scale-codec", version = "3.6.5", default-features = false }
 scale-info = { version = "2.9.0", default-features = false }
+serde = { version = "1.0.194", default-features = false, features = ["alloc", "derive"] }
 serde_json = "1.0.111"
 # Substrate (Client)
 sc-authority-discovery = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.5.0" }
