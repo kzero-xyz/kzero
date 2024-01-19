@@ -29,9 +29,27 @@ pub struct Signature<S> {
     source: JwkId,
     input: ZkLoginInputs,
     max_epoch: u64,
-    // todo: remove eph_pubkey
     eph_pubkey_bytes: [u8; EPH_PUB_KEY_LEN],
     sig: S,
+}
+
+impl<S> Signature<S> {
+
+    pub fn new(source: JwkId, input: ZkLoginInputs, max_epoch: u64, eph_pubkey_bytes: [u8; 33], sig: S) -> Self {
+        Self {
+            source,
+            input,
+            max_epoch,
+            eph_pubkey_bytes,
+            sig,
+        }
+    }
+
+    pub fn get_onchain_address(&self) -> AccountId32 {
+        let address_seed = self.input.get_address_seed();
+        let s: [u8; 32] = address_seed.into();
+        AccountId32::from(s)
+    }
 }
 
 impl<S> Verify for Signature<S>
@@ -47,15 +65,12 @@ where
         signer: &<Self::Signer as IdentifyAccount>::AccountId,
     ) -> bool {
         // check the validity of signer
-        let address_seed = self.input.get_address_seed();
-        let s: [u8; 32] = address_seed.into();
-        let account_id = AccountId32::from(s);
+       let account_id = self.get_onchain_address();
 
         if &account_id != signer {
             return false;
         }
 
-        // todo: remove
         let pub_key: AccountId32 = if EPH_PUB_KEY_LEN == 33 {
             let mut d = [0_u8; 32];
             d.copy_from_slice(&self.eph_pubkey_bytes[1..]);

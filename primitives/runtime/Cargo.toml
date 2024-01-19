@@ -7,18 +7,25 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
+# encode/decode
+scale-codec = { workspace = true, default-features = false, features = ["derive"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+serde_json = { workspace = true }
+# ser/deser
+base64ct = { version = "1.5.3", features = ["alloc"] }
+serde = { workspace = true, optional = true }
+
+# zk primitives
 ark-bn254 = { version = "0.4.0", default-features = false, features = ["curve"] }
 ark-crypto-primitives = { version = "=0.4.0", default-features = false }
 ark-ff = { version = "0.4.1", default-features = false, features = ["asm"] }
 ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", default-features = false }
 ark-relations = { version = "0.4.0", default-features = false }
-base64ct = { version = "1.5.3", features = ["alloc"] }
 ff = { version = "0.13.0", default-features = false, features = ["derive"] }
 num-bigint = { version = "0.4.4", default-features = false }
 poseidon-ark = { git = "https://github.com/dejavukong/poseidon-ark", branch = "no-std", default-features = false }
-scale-codec = { workspace = true, default-features = false, features = ["derive"] }
-scale-info = { workspace = true, default-features = false, features = ["derive"] }
-serde = { workspace = true, optional = true }
+
+# substrate
 sp-core = { workspace = true }
 sp-io = { workspace = true }
 sp-runtime = { workspace = true }
@@ -33,14 +40,12 @@ try-runtime = [
 ]
 default = ["std"]
 std = [
-    "serde/std",
     "scale-codec/std",
     "scale-info/std",
-    "sp-runtime/std",
-    "sp-core/std",
-    "sp-io/std",
-    "sp-std/std",
-    # zk
+    "serde/std",
+    "serde_json/std",
+    "base64ct/std",
+    # zk primitives
     "ark-crypto-primitives/std",
     "ark-groth16/std",
     "ark-bn254/std",
@@ -48,10 +53,14 @@ std = [
     "ff/std",
     "ark-ff/std",
     "poseidon-ark/std",
-    "base64ct/std",
     "num-bigint/std",
+    # substrate
+    "sp-runtime/std",
+    "sp-core/std",
+    "sp-io/std",
+    "sp-std/std",
 ]
-
+testing = []
 # Serde support without relying on std features.
 serde = [
     "dep:serde",

@@ -14,7 +14,7 @@ scale-codec = { package = "parity-scale-codec", workspace = true }
 scale-info = { workspace = true }
 
 # zklogin runtime
-zklogin-runtime = { path = "../primitives/runtime" }
+zklogin-runtime = { path = "../primitives/runtime", default-features = false, features = ["testing"] }
 
 # Substrate
 sp-api = { workspace = true }
@@ -50,6 +50,9 @@ pallet-transaction-payment-rpc-runtime-api = { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder = { workspace = true, optional = true }
+
+[dev-dependencies]
+zklogin-runtime = { path = "../primitives/runtime", features = ["testing"]}
 
 [features]
 default = ["std"]
@@ -89,7 +92,7 @@ std = [
     "pallet-timestamp/std",
     "pallet-transaction-payment-rpc-runtime-api/std",
     "pallet-transaction-payment/std",
-
+    "zklogin-runtime/std",
 ]
 runtime-benchmarks = [
     "sp-runtime/runtime-benchmarks",

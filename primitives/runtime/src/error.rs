@@ -15,6 +15,9 @@ pub enum ZkAuthError {
     /// JWK not found
     JWKNotFound,
 
+    /// Ephemeral pubkey length error
+    EphPubkeyLengthWrong(usize),
+
     /// Modulus base64 decode error
     ModulusDecodeError,
 
@@ -23,6 +26,11 @@ pub enum ZkAuthError {
 
     /// General cryptographic error.
     GeneralError(SynthesisError),
+
+    /// Onchain address parse Error
+    AddressParseError,
+
+    TestError(()),
 }
 
 impl From<SynthesisError> for ZkAuthError {

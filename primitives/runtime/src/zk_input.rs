@@ -15,10 +15,10 @@ use sp_std::{str::FromStr, vec};
 
 #[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
 pub struct ZkLoginInputs {
-    proof_points: ZkLoginProof,
-    iss_base64_details: Claim,
-    header: U256,
-    address_seed: U256,
+    pub(crate) proof_points: ZkLoginProof,
+    pub(crate) iss_base64_details: Claim,
+    pub(crate) header: U256,
+    pub(crate) address_seed: U256,
 }
 
 impl ZkLoginInputs {
@@ -61,18 +61,21 @@ impl ZkLoginInputs {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
 pub struct Claim {
-    value: U256,
-    index_mod_4: u8,
+    pub(crate) value: U256,
+    pub(crate) index_mod_4: u8,
 }
 
 /// The struct for zk login proof.
+// TODO add construct func
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
 pub struct ZkLoginProof {
-    a: CircomG1,
-    b: CircomG2,
-    c: CircomG1,
+    pub(crate) a: CircomG1,
+    pub(crate) b: CircomG2,
+    pub(crate) c: CircomG1,
 }
 
 impl ZkLoginProof {
