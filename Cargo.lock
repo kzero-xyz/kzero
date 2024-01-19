@@ -4714,6 +4714,7 @@ dependencies = [
  "frame-benchmarking-cli",
  "frame-system",
  "futures",
+ "hex",
  "jsonrpsee",
  "node-template-runtime",
  "pallet-transaction-payment",
@@ -4747,6 +4748,7 @@ dependencies = [
  "substrate-build-script-utils",
  "substrate-frame-rpc-system",
  "try-runtime-cli",
+ "zklogin-runtime",
 ]
 
 [[package]]
@@ -4760,6 +4762,7 @@ dependencies = [
  "frame-system-benchmarking",
  "frame-system-rpc-runtime-api",
  "frame-try-runtime",
+ "hex",
  "pallet-aura",
  "pallet-balances",
  "pallet-grandpa",

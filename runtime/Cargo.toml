@@ -53,6 +53,7 @@ substrate-wasm-builder = { workspace = true, optional = true }
 
 [dev-dependencies]
 zklogin-runtime = { path = "../primitives/runtime", features = ["testing"]}
+hex = "0.4.3"
 
 [features]
 default = ["std"]

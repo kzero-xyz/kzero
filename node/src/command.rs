@@ -1,5 +1,6 @@
 use crate::{
     benchmarking::{inherent_benchmark_data, RemarkBuilder, TransferKeepAliveBuilder},
+    zklogin_benchmarking::{ZkTransferKeepAliveBuilder, ZkLoginRemarkBuilder},
     chain_spec,
     cli::{Cli, Subcommand},
     service,
@@ -140,7 +141,7 @@ pub fn run() -> sc_cli::Result<()> {
                     }
                     BenchmarkCmd::Overhead(cmd) => {
                         let PartialComponents { client, .. } = service::new_partial(&config)?;
-                        let ext_builder = RemarkBuilder::new(client.clone());
+                        let ext_builder = ZkLoginRemarkBuilder::new(client.clone());
 
                         cmd.run(
                             config,
@@ -149,13 +150,13 @@ pub fn run() -> sc_cli::Result<()> {
                             Vec::new(),
                             &ext_builder,
                         )
-                    }
+                    },
                     BenchmarkCmd::Extrinsic(cmd) => {
                         let PartialComponents { client, .. } = service::new_partial(&config)?;
                         // Register the *Remark* and *TKA* builders.
                         let ext_factory = ExtrinsicFactory(vec![
-                            Box::new(RemarkBuilder::new(client.clone())),
-                            Box::new(TransferKeepAliveBuilder::new(
+                            Box::new(ZkLoginRemarkBuilder::new(client.clone())),
+                            Box::new(ZkTransferKeepAliveBuilder::new(
                                 client.clone(),
                                 Sr25519Keyring::Alice.to_account_id(),
                                 EXISTENTIAL_DEPOSIT,

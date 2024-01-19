@@ -7,7 +7,7 @@ mod cli;
 mod command;
 mod rpc;
 mod service;
-
+mod zklogin_benchmarking;
 fn main() -> sc_cli::Result<()> {
     command::run()
 }

@@ -1,8 +1,9 @@
+use std::str::FromStr;
 use frame_support::BoundedVec;
 use frame_system::Call::remark;
 use pallet_balances::Call;
 use scale_codec::Encode;
-use sp_core::Pair;
+use sp_core::{H256, Pair};
 use sp_runtime::generic::Era;
 use sp_runtime::{MultiAddress, MultiSignature};
 use zklogin_runtime::{EPH_PUB_KEY_LEN, ZkMultiSignature};
@@ -35,11 +36,26 @@ fn create_transaction<P: Pair<Signature = sp_core::ed25519::Signature>>(
         pallet_transaction_payment::ChargeTransactionPayment::from(tip.into()),
     );
 
-    let raw_payload = SignedPayload::new(call, extra)
-        .map_err(|e| {
-            // log::warn!("Unable to create signed payload: {:?}", e);
-        })
-        .ok().unwrap();
+    // let raw_payload = SignedPayload::new(call, extra)
+    //     .map_err(|e| {
+    //         // log::warn!("Unable to create signed payload: {:?}", e);
+    //     })
+    //     .ok().unwrap();
+
+    let raw_payload = crate::SignedPayload::from_raw(
+        call.clone(),
+        extra.clone(),
+        (
+            (),
+            crate::VERSION.spec_version,
+            crate::VERSION.transaction_version,
+            H256::from_str("16c4315726d1171bd56ae716f2781f4acce0b4d767cb6fcaa54139085dcb8d83").expect(""),
+            H256::from_str("0").expect(""),
+            (),
+            (),
+            (),
+        ),
+    );
     let signature = raw_payload.using_encoded(|payload| pair.sign(payload));
 
     // construct inner zk sig
@@ -80,5 +96,5 @@ fn create_encoded_extrinsic() {
     );
 
     let encoded = Encode::encode(&zk_transaction);
-    println!("encoded zk transaction is {:?}", &encoded);
+    println!("encoded zk transaction is {:?}", );
 }

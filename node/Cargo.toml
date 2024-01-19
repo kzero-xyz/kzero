@@ -58,6 +58,11 @@ node-template-runtime = { workspace = true, features = ["default"] }
 # CLI-specific dependencies
 try-runtime-cli = { workspace = true, optional = true }
 
+# zklogin
+zklogin-runtime = { path = "../primitives/runtime", features = ["default"]}
+
+hex = "0.4.3"
+
 [build-dependencies]
 substrate-build-script-utils = { workspace = true }
 

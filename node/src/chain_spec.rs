@@ -3,6 +3,7 @@ use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{sr25519, Pair, Public};
+use sp_core::crypto::AccountId32;
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 // The URL for the telemetry server.
@@ -85,6 +86,9 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
             get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
             get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
             get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
+
+            // todo: remove hardcode zklogin address,
+            // AccountId32::from("0x197cf48b729ff12596cbc046c7fe8f88f92ac5f0b6fc42b4c1dcc532d37ccea2");
         ],
         true,
     ))

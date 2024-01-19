@@ -4,7 +4,7 @@ use crate::{
     zk_sig::{verify_zk_login, ZkLoginEnv},
 };
 use sp_core::{bounded::BoundedVec, ConstU32, U256};
-use sp_core::crypto::Pair as TPair;
+use sp_core::crypto::{AccountId32, Pair as TPair};
 use sp_core::ed25519::Pair;
 use crate::test_helper::{get_raw_data, get_zklogin_inputs};
 use crate::zk_input::ZkLoginInputs;
@@ -14,6 +14,9 @@ use crate::zk_input::ZkLoginInputs;
 fn verify_zklogin() {
     let (address_seed, input_data, max_epoch, eph_pubkey_bytes) = get_raw_data();
     let input  = get_zklogin_inputs(address_seed, input_data);
+    let s: [u8; 32] = input.get_address_seed().into();
+    let account_id = AccountId32::from(s);
+    println!("onchain account_id is {}", &account_id);
 
     let google_kid = "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781";
     let google_jwk_id = JwkId::new(
