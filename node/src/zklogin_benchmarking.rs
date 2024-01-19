@@ -8,17 +8,18 @@ use node_template_runtime as runtime;
 use runtime::{AccountId, Balance, BalancesCall, SystemCall};
 use sc_cli::Result;
 use sc_client_api::BlockBackend;
-use sp_core::{ConstU32, Encode, Pair};
-use sp_core::ed25519::Pair as Ed25519Pair;
+use sp_core::{ed25519::Pair as Ed25519Pair, ConstU32, Encode, Pair};
 use sp_inherents::{InherentData, InherentDataProvider};
-use sp_runtime::{MultiAddress, MultiSignature, OpaqueExtrinsic, SaturatedConversion};
+use sp_runtime::{MultiAddress, OpaqueExtrinsic};
 
-use std::{sync::Arc, time::Duration};
 use sp_core::bounded_vec::BoundedVec;
 use sp_runtime::generic::Era;
-use zklogin_runtime::jwk::{JwkId, JWKProvider};
-use zklogin_runtime::test_helper::{get_raw_data, get_zklogin_inputs};
-use zklogin_runtime::zk_sig::Signature as InnerZkSignature;
+use std::{sync::Arc, time::Duration};
+use zklogin_runtime::{
+    jwk::{JWKProvider, JwkId},
+    test_helper::{get_raw_data, get_zklogin_inputs},
+    zk_sig::Signature as InnerZkSignature,
+};
 
 /// Generates extrinsics for the `benchmark overhead` command.
 ///
@@ -45,8 +46,8 @@ impl frame_benchmarking_cli::ExtrinsicBuilder for ZkLoginRemarkBuilder {
 
     fn build(&self, nonce: u32) -> std::result::Result<OpaqueExtrinsic, &'static str> {
         let pri_key = [
-            251, 112, 167, 63, 195, 4, 26, 202, 18, 45, 182, 138, 84, 202, 34, 15,
-            209, 217, 76, 114, 180, 67, 72, 157, 104, 241, 172, 212, 122, 18, 74, 54
+            251, 112, 167, 63, 195, 4, 26, 202, 18, 45, 182, 138, 84, 202, 34, 15, 209, 217, 76,
+            114, 180, 67, 72, 157, 104, 241, 172, 212, 122, 18, 74, 54,
         ];
         let acc = Ed25519Pair::from_seed(&pri_key);
         let extrinsic: OpaqueExtrinsic = create_zklogin_benchmark_extrinsic(
@@ -88,8 +89,8 @@ impl frame_benchmarking_cli::ExtrinsicBuilder for ZkTransferKeepAliveBuilder {
 
     fn build(&self, nonce: u32) -> std::result::Result<OpaqueExtrinsic, &'static str> {
         let pri_key = [
-            251, 112, 167, 63, 195, 4, 26, 202, 18, 45, 182, 138, 84, 202, 34, 15,
-            209, 217, 76, 114, 180, 67, 72, 157, 104, 241, 172, 212, 122, 18, 74, 54
+            251, 112, 167, 63, 195, 4, 26, 202, 18, 45, 182, 138, 84, 202, 34, 15, 209, 217, 76,
+            114, 180, 67, 72, 157, 104, 241, 172, 212, 122, 18, 74, 54,
         ];
 
         let acc = Ed25519Pair::from_seed(&pri_key);
@@ -117,12 +118,7 @@ pub fn create_zklogin_benchmark_extrinsic(
 ) -> runtime::UncheckedExtrinsic {
     let genesis_hash = client.block_hash(0).ok().flatten().expect("Genesis block exists; qed");
     let best_hash = client.chain_info().best_hash;
-    let best_block = client.chain_info().best_number;
 
-    // let period = runtime::BlockHashCount::get()
-    //     .checked_next_power_of_two()
-    //     .map(|c| c / 2)
-    //     .unwrap_or(2) as u64;
     let extra: runtime::SignedExtra = (
         frame_system::CheckNonZeroSender::<runtime::Runtime>::new(),
         frame_system::CheckSpecVersion::<runtime::Runtime>::new(),
@@ -149,13 +145,10 @@ pub fn create_zklogin_benchmark_extrinsic(
         ),
     );
 
-    let signature = raw_payload.using_encoded(|e| {
-        println!("payload: {}", hex::encode(e));
-        sender.sign(e)
-    });
+    let signature = raw_payload.using_encoded(|e| sender.sign(e));
 
     let (address_seed, input_data, max_epoch, eph_pubkey_bytes) = get_raw_data();
-    let input  = get_zklogin_inputs(address_seed, input_data);
+    let input = get_zklogin_inputs(address_seed, input_data);
 
     let google_kid = "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781";
     let google_jwk_id = JwkId::new(
@@ -165,23 +158,22 @@ pub fn create_zklogin_benchmark_extrinsic(
 
     let eph_pubkey = <[u8; 33]>::try_from(eph_pubkey_bytes).expect("pubkey parse error");
     // construct inner zk sig
-    let inner_zk_sig = InnerZkSignature::new(google_jwk_id, input, max_epoch, eph_pubkey, signature.into());
+    let inner_zk_sig =
+        InnerZkSignature::new(google_jwk_id, input, max_epoch, eph_pubkey, signature.into());
 
     let address = MultiAddress::from(inner_zk_sig.get_onchain_address());
 
-    let ux = runtime::UncheckedExtrinsic::new_signed(
+    let utx = runtime::UncheckedExtrinsic::new_signed(
         call,
         address,
         runtime::Signature::Zk(inner_zk_sig),
         extra,
     );
 
-    let v = ux.encode();
-    let s = hex::encode(&v);
-    println!("========{s}");
-    let s = hex::encode(v.encode());
-    println!("***{s}");
-    ux
+    let encoded = Encode::encode(&utx);
+    println!("sending tx: {}", &hex::encode(encoded));
+
+    utx
 }
 
 /// Generates inherent data for the `benchmark overhead` command.

@@ -1,16 +1,15 @@
 use crate::{
     error::{ZkAuthError, ZkAuthResult},
     poseidon::poseidon_zk_login,
-    zk_input::{Bn254Fr, Claim, ZkLoginProof},
+    zk_input::{Bn254Fr, Claim, ZkLoginInputs, ZkLoginProof},
     PACK_WIDTH,
 };
 use ark_ff::Zero;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
+use serde_json;
 use sp_core::U256;
 use std::str::FromStr;
-use crate::zk_input::ZkLoginInputs;
-use serde_json;
 
 pub const MAX_KEY_CLAIM_NAME_LENGTH: u8 = 32;
 pub const MAX_KEY_CLAIM_VALUE_LENGTH: u8 = 115;
@@ -47,10 +46,7 @@ pub struct ZkLoginInputsReader {
 
 impl From<ClaimJson> for Claim {
     fn from(value: ClaimJson) -> Self {
-        Self {
-            value: U256::from_dec_str(&value.value).expect(""),
-            index_mod_4: value.index_mod_4,
-        }
+        Self { value: U256::from_dec_str(&value.value).expect(""), index_mod_4: value.index_mod_4 }
     }
 }
 
@@ -92,12 +88,10 @@ impl ZkLoginInputs {
             proof_points: reader.proof_points,
             iss_base64_details: reader.iss_base64_details,
             header: reader.header,
-            address_seed: U256::from_dec_str(address_seed)
-                .map_err(|e| e.to_string())?,
+            address_seed: U256::from_dec_str(address_seed).map_err(|e| e.to_string())?,
         })
     }
 }
-
 
 pub fn gen_address_seed(
     salt: &str,
@@ -118,30 +112,20 @@ pub fn hash_ascii_str_to_field(str: &str, max_size: u8) -> ZkAuthResult<Bn254Fr>
     hash_to_field(&str_padded, 8, PACK_WIDTH)
 }
 
-pub fn hash_to_field(
-    input: &[BigUint],
-    in_width: u16,
-    pack_width: u8,
-) -> ZkAuthResult<Bn254Fr> {
+pub fn hash_to_field(input: &[BigUint], in_width: u16, pack_width: u8) -> ZkAuthResult<Bn254Fr> {
     let packed = convert_base(input, in_width, pack_width)?;
     poseidon_zk_login(packed)
 }
 
 /// Helper function to pack field elements from big ints.
-fn convert_base(
-    in_arr: &[BigUint],
-    in_width: u16,
-    out_width: u8,
-) -> ZkAuthResult<Vec<Bn254Fr>> {
+fn convert_base(in_arr: &[BigUint], in_width: u16, out_width: u8) -> ZkAuthResult<Vec<Bn254Fr>> {
     let bits = big_int_array_to_bits(in_arr, in_width as usize);
     let mut packed: Vec<Bn254Fr> = bits
         .rchunks(out_width as usize)
         .map(|chunk| Bn254Fr::from(BigUint::from_radix_be(chunk, 2).unwrap()))
         .collect();
     packed.reverse();
-    match packed.len()
-        != div_ceil(in_arr.len() * in_width as usize, out_width as usize).unwrap()
-    {
+    match packed.len() != div_ceil(in_arr.len() * in_width as usize, out_width as usize).unwrap() {
         true => Err(ZkAuthError::InvalidInput),
         false => Ok(packed),
     }
@@ -197,9 +181,8 @@ pub(crate) fn gen_address_seed_with_salt_hash(
         hash_ascii_str_to_field(aud, MAX_AUD_VALUE_LENGTH)?,
         to_field(salt_hash)?,
     ])?
-        .to_string())
+    .to_string())
 }
-
 
 pub fn get_raw_data() -> (String, String, u64, Vec<u8>) {
     let user_salt = "6903439401297002981078976741241818963710729444388942281949823152082404716376301797176193848";
@@ -210,7 +193,7 @@ pub fn get_raw_data() -> (String, String, u64, Vec<u8>) {
         "111140461530246164526", // sub
         "560629365517-mt9j9arflcgi35i8hpoptr66qgo1lmfm.apps.googleusercontent.com", // clientID
     )
-        .unwrap();
+    .unwrap();
 
     let proof_data = r#"{
         "proof_points": {
@@ -255,10 +238,7 @@ pub fn get_raw_data() -> (String, String, u64, Vec<u8>) {
     return (address_seed, proof_data.to_owned(), max_epoch, eph_pubkey_bytes.to_vec());
 }
 
-pub fn get_zklogin_inputs(
-    address_seed: String,
-    proof_data: String
-) -> ZkLoginInputs {
+pub fn get_zklogin_inputs(address_seed: String, proof_data: String) -> ZkLoginInputs {
     let input = ZkLoginInputs::from_json(&proof_data, &address_seed).expect("wrong json parse");
     input
 }

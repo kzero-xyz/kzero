@@ -59,7 +59,7 @@ node-template-runtime = { workspace = true, features = ["default"] }
 try-runtime-cli = { workspace = true, optional = true }
 
 # zklogin
-zklogin-runtime = { path = "../primitives/runtime", features = ["default"]}
+zklogin-runtime = { path = "../primitives/runtime", features = ["default"] }
 
 hex = "0.4.3"
 

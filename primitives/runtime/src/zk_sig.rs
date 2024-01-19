@@ -34,15 +34,14 @@ pub struct Signature<S> {
 }
 
 impl<S> Signature<S> {
-
-    pub fn new(source: JwkId, input: ZkLoginInputs, max_epoch: u64, eph_pubkey_bytes: [u8; 33], sig: S) -> Self {
-        Self {
-            source,
-            input,
-            max_epoch,
-            eph_pubkey_bytes,
-            sig,
-        }
+    pub fn new(
+        source: JwkId,
+        input: ZkLoginInputs,
+        max_epoch: u64,
+        eph_pubkey_bytes: [u8; 33],
+        sig: S,
+    ) -> Self {
+        Self { source, input, max_epoch, eph_pubkey_bytes, sig }
     }
 
     pub fn get_onchain_address(&self) -> AccountId32 {
@@ -65,7 +64,7 @@ where
         signer: &<Self::Signer as IdentifyAccount>::AccountId,
     ) -> bool {
         // check the validity of signer
-       let account_id = self.get_onchain_address();
+        let account_id = self.get_onchain_address();
 
         if &account_id != signer {
             return false;

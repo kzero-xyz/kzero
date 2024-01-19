@@ -6,13 +6,13 @@ mod error;
 pub mod jwk;
 mod poseidon;
 mod pvk;
+#[cfg(feature = "std")]
+pub mod test_helper;
 #[cfg(test)]
 mod tests;
 mod utils;
 pub mod zk_input;
 pub mod zk_sig;
-#[cfg(feature = "std")]
-pub mod test_helper;
 
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
