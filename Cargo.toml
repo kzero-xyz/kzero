@@ -129,5 +129,6 @@ substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk", b
 try-runtime-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.5.0" }
 
 # Local
+pallet-zklogin = { path = "./frame/zklogin", default-features = false }
 node-template = { path = "./node" }
 node-template-runtime = { path = "./runtime", default-features = false }

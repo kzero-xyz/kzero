@@ -40,6 +40,7 @@ pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
+use sp_runtime::traits::{AccountIdLookup, IdentityLookup, ValidateUnsigned};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
@@ -247,6 +248,18 @@ impl pallet_sudo::Config for Runtime {
     type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
 }
 
+impl pallet_zklogin::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Extrinsic = UncheckedExtrinsic;
+
+    type CheckedExtrinsic =
+        <UncheckedExtrinsic as sp_runtime::traits::Checkable<Self::Context>>::Checked;
+
+    type UnsignedValidator = Runtime;
+
+    type Context = frame_system::ChainContext<Runtime>;
+}
+
 // Create the zksig by composing the FRAME pallets that were previously configured.
 construct_runtime!(
     pub struct Runtime {
@@ -256,6 +269,9 @@ construct_runtime!(
         Grandpa: pallet_grandpa,
         Balances: pallet_balances,
         TransactionPayment: pallet_transaction_payment,
+
+        ZkLogin: pallet_zklogin,
+
         Sudo: pallet_sudo,
     }
 );

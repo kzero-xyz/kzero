@@ -47,6 +47,8 @@ pallet-sudo = { workspace = true }
 pallet-timestamp = { workspace = true }
 pallet-transaction-payment = { workspace = true }
 pallet-transaction-payment-rpc-runtime-api = { workspace = true }
+# local pallets
+pallet-zklogin = { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder = { workspace = true, optional = true }
@@ -94,6 +96,8 @@ std = [
     "pallet-transaction-payment-rpc-runtime-api/std",
     "pallet-transaction-payment/std",
     "zklogin-signature/std",
+    # local pallets
+    "pallet-zklogin/std",
 ]
 runtime-benchmarks = [
     "sp-runtime/runtime-benchmarks",
@@ -105,6 +109,8 @@ runtime-benchmarks = [
     "pallet-grandpa/runtime-benchmarks",
     "pallet-sudo/runtime-benchmarks",
     "pallet-timestamp/runtime-benchmarks",
+    # local pallets
+    "pallet-zklogin/runtime-benchmarks",
 ]
 try-runtime = [
     "sp-runtime/try-runtime",
@@ -118,5 +124,7 @@ try-runtime = [
     "pallet-sudo/try-runtime",
     "pallet-timestamp/try-runtime",
     "pallet-transaction-payment/try-runtime",
+    # local pallets
+    "pallet-zklogin/try-runtime",
 ]
 experimental = ["pallet-aura/experimental"]
