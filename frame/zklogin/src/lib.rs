@@ -4,11 +4,12 @@ mod tests;
 
 use scale_codec::{Codec, Encode};
 
-use frame_support::dispatch::{DispatchClass, DispatchInfo, DispatchResult, GetDispatchInfo};
+use frame_support::dispatch::{
+    DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo, PostDispatchInfo,
+};
 use sp_runtime::{
     traits::{Applyable, BlockNumberProvider, Checkable, Dispatchable, StaticLookup},
-    transaction_validity::InvalidTransaction,
-    ApplyExtrinsicResult,
+    transaction_validity::{InvalidTransaction, TransactionValidityError, UnknownTransaction},
 };
 use sp_std::prelude::*;
 use zklogin_support::ReplaceSender;
@@ -21,7 +22,7 @@ pub use pallet::*;
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
-    use frame_support::pallet_prelude::*;
+    use frame_support::{dispatch::PostDispatchInfo, pallet_prelude::*};
     use frame_system::pallet_prelude::*;
     use sp_core::{crypto::AccountId32, U256};
     use zp_zklogin::{JwkId, ZkLoginEnv, EPH_PUB_KEY_LEN};
@@ -59,7 +60,13 @@ pub mod pallet {
 
     #[pallet::error]
     pub enum Error<T> {
+        /// TODO
         EphKeyExpired,
+        /// TODO
+        InvalidTransaction,
+        UnknownTransactionCannotLookup,
+        UnknownTransactionNoUnsignedValidator,
+        UnknownTransactionCustom,
     }
 
     #[pallet::pallet]
@@ -71,7 +78,7 @@ pub mod pallet {
     #[pallet::call]
     impl<T: Config> Pallet<T>
     where
-        T::RuntimeCall: Dispatchable<Info = DispatchInfo>,
+        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
     {
         #[pallet::call_index(0)]
         #[pallet::weight(0)]
@@ -93,15 +100,14 @@ pub mod pallet {
             ensure!(expire_at <= now, Error::<T>::EphKeyExpired);
 
             // execute real call
-            let r = Executive::<T>::apply_extrinsic(uxt, address_seed);
-            Ok(().into())
+            Executive::<T>::apply_extrinsic(uxt, address_seed)
         }
     }
 
     #[pallet::validate_unsigned]
     impl<T: Config> ValidateUnsigned for Pallet<T>
     where
-        T::RuntimeCall: Dispatchable<Info = DispatchInfo>,
+        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
         T: frame_system::Config<AccountId = AccountId32>,
     {
         type Call = Call<T>;
@@ -124,7 +130,9 @@ pub mod pallet {
                     eph_pubkey,
                     ..
                 } => {
-                    let _xt = uxt.clone().check(&T::Context::default())?;
+                    let xt = uxt.clone().check(&T::Context::default())?;
+                    // TODO we think we only support Normal transaction by filter dispatchinfo.class
+                    // TODO we only allow signed extrinsic, others should deny
 
                     let address_seed = T::Lookup::lookup(address_seed.clone())?;
 
@@ -141,13 +149,15 @@ pub mod pallet {
                         &ZkLoginEnv::Prod,
                     )
                     .map_err(|_| InvalidTransaction::BadProof)?;
+                    // TODO
+                    // xt.replace_signer()
+                    // xt.validate::<UnsignedValidator>(source, &dispatch_info, encoded_len)
+                    // TODO;
+                    Ok(ValidTransaction::default())
                 }
                 // TODO use other error type
-                _ => return Err(UnknownTransaction::Custom(0).into()),
+                _ => Err(UnknownTransaction::Custom(0).into()),
             }
-
-            // TODO;
-            Ok(ValidTransaction::default())
         }
     }
 }
@@ -157,13 +167,12 @@ struct Executive<T>(sp_std::marker::PhantomData<T>);
 
 impl<T: Config> Executive<T>
 where
-    T::RuntimeCall: Dispatchable<Info = DispatchInfo>,
+    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
 {
     fn apply_extrinsic(
         uxt: Box<T::Extrinsic>,
         address_seed: AccountIdLookupOf<T>,
-    ) -> ApplyExtrinsicResult {
-        use scale_codec::Decode;
+    ) -> DispatchResultWithPostInfo {
         let encoded = uxt.encode();
         let encoded_len = encoded.len();
 
@@ -172,16 +181,32 @@ where
         xt.replace_sender(T::Lookup::lookup(address_seed).expect("lookup should succeed"));
 
         let dispatch_info = xt.get_dispatch_info();
-        let r = Applyable::apply::<T::UnsignedValidator>(xt, &dispatch_info, encoded_len)?;
+        let r = Applyable::apply::<T::UnsignedValidator>(xt, &dispatch_info, encoded_len)
+            .map_err(Error::<T>::from)?;
 
-        // Mandatory(inherents) are not allowed to fail.
-        //
-        // The entire block should be discarded if an inherent fails to apply. Otherwise
-        // it may open an attack vector.
+        // todo deposit event
+
+        // For we has checked the `dispatch_info.class` in `validate_unsigned`, so the check at here is not
+        // necessary. We keep this to be same implementation in `Executive`.
         if r.is_err() && dispatch_info.class == DispatchClass::Mandatory {
-            return Err(InvalidTransaction::BadMandatory.into())
+            return Err(Error::<T>::InvalidTransaction.into())
         }
 
-        Ok(r.map(|_| ()).map_err(|e| e.error))
+        r
+    }
+}
+
+impl<T: Config> From<TransactionValidityError> for Error<T> {
+    fn from(value: TransactionValidityError) -> Self {
+        match value {
+            TransactionValidityError::Invalid(_) => Error::InvalidTransaction,
+            TransactionValidityError::Unknown(u) => match u {
+                UnknownTransaction::CannotLookup => Error::UnknownTransactionCannotLookup,
+                UnknownTransaction::NoUnsignedValidator => {
+                    Error::UnknownTransactionNoUnsignedValidator
+                }
+                UnknownTransaction::Custom(_) => Error::UnknownTransactionCustom,
+            },
+        }
     }
 }

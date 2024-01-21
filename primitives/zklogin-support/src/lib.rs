@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use sp_runtime::{generic::CheckedExtrinsic, MultiAddress};
+use sp_runtime::generic::CheckedExtrinsic;
 
 pub trait ReplaceSender {
     type AccountId;
