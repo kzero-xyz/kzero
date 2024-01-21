@@ -24,7 +24,7 @@ use sp_runtime::{
 use error::ZkAuthError;
 
 pub const PACK_WIDTH: u8 = 248;
-pub const EPH_PUB_KEY_LEN: usize = 33;
+pub const EPH_PUB_KEY_LEN: usize = 32;
 
 /// Wrapped MultiSignature that is compatible with Substrate
 #[derive(Eq, PartialEq, Clone, Encode, Decode, MaxEncodedLen, RuntimeDebug, TypeInfo)]

@@ -30,7 +30,7 @@ pub struct Signature<S> {
     source: JwkId,
     input: ZkLoginInputs,
     max_epoch: u64,
-    eph_pubkey_bytes: [u8; EPH_PUB_KEY_LEN],
+    eph_pubkey: [u8; EPH_PUB_KEY_LEN],
     sig: S,
 }
 
@@ -39,10 +39,10 @@ impl<S> Signature<S> {
         source: JwkId,
         input: ZkLoginInputs,
         max_epoch: u64,
-        eph_pubkey_bytes: [u8; 33],
+        eph_pubkey: [u8; 32],
         sig: S,
     ) -> Self {
-        Self { source, input, max_epoch, eph_pubkey_bytes, sig }
+        Self { source, input, max_epoch, eph_pubkey, sig }
     }
 }
 
@@ -60,15 +60,7 @@ where
     ) -> bool {
         let address_seed = U256::from_big_endian(signer.as_ref());
 
-        let pub_key: AccountId32 = if EPH_PUB_KEY_LEN == 33 {
-            let mut d = [0_u8; 32];
-            d.copy_from_slice(&self.eph_pubkey_bytes[1..]);
-            d.into()
-        } else {
-            todo!("unimpl");
-        };
-
-        if !self.sig.verify(msg, &pub_key) {
+        if !self.sig.verify(msg, &AccountId32::from(self.eph_pubkey)) {
             return false
         }
 
@@ -78,7 +70,7 @@ where
             &self.input,
             &self.source,
             self.max_epoch,
-            &self.eph_pubkey_bytes,
+            &self.eph_pubkey,
             &ZkLoginEnv::Prod,
         )
         .is_ok()

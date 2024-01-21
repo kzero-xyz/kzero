@@ -1,18 +1,9 @@
 use crate::{
     jwk::{JWKProvider, JwkId},
-    test_helper::{
-        gen_address_seed, get_raw_data, get_zklogin_inputs, ZkLoginInputsReader,
-        ZkLoginInputsReaderJson,
-    },
-    zk_input::ZkLoginInputs,
+    test_helper::{get_raw_data, get_zklogin_inputs},
     zk_sig::{verify_zk_login, ZkLoginEnv},
 };
-use sp_core::{
-    bounded::BoundedVec,
-    crypto::{AccountId32, Pair as TPair},
-    ed25519::Pair,
-    ConstU32, U256,
-};
+use sp_core::{bounded::BoundedVec, crypto::Pair as TPair, ed25519::Pair, ConstU32, U256};
 
 #[test]
 fn verify_zklogin() {
@@ -50,5 +41,5 @@ fn eph_key_generate_correct() {
     let pair = Pair::from_seed(&pri_key);
     let public = pair.public();
 
-    assert_eq!(public.0.as_slice(), &eph_pubkey[1..]);
+    assert_eq!(public.0, eph_pubkey);
 }

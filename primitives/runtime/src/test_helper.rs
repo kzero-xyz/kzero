@@ -183,7 +183,7 @@ pub(crate) fn gen_address_seed_with_salt_hash(
     .to_string())
 }
 
-pub fn get_raw_data() -> (AccountId32, String, u64, Vec<u8>) {
+pub fn get_raw_data() -> (AccountId32, String, u64, [u8; 32]) {
     let user_salt = "6903439401297002981078976741241818963710729444388942281949823152082404716376301797176193848";
 
     let address_seed = gen_address_seed(
@@ -233,12 +233,12 @@ pub fn get_raw_data() -> (AccountId32, String, u64, Vec<u8>) {
     }"#;
 
     let max_epoch: u64 = 834;
-    let eph_pubkey_bytes: &[u8] = &[
-        0, 250, 253, 29, 158, 37, 168, 126, 150, 82, 151, 106, 123, 176, 108, 46, 71, 119, 194,
-        229, 57, 217, 15, 62, 231, 182, 177, 43, 154, 69, 17, 138, 136,
+    let eph_pubkey_bytes: [u8; 32] = [
+        250, 253, 29, 158, 37, 168, 126, 150, 82, 151, 106, 123, 176, 108, 46, 71, 119, 194, 229,
+        57, 217, 15, 62, 231, 182, 177, 43, 154, 69, 17, 138, 136,
     ];
 
-    return (address_seed, proof_data.to_owned(), max_epoch, eph_pubkey_bytes.to_vec());
+    return (address_seed, proof_data.to_owned(), max_epoch, eph_pubkey_bytes);
 }
 
 pub fn get_zklogin_inputs(proof_data: String) -> ZkLoginInputs {

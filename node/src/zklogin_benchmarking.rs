@@ -88,12 +88,13 @@ impl frame_benchmarking_cli::ExtrinsicBuilder for ZkTransferKeepAliveBuilder {
     }
 
     fn build(&self, nonce: u32) -> std::result::Result<OpaqueExtrinsic, &'static str> {
-        let pri_key = [
+        // hardcode eph private key
+        let eph_pri_key = [
             251, 112, 167, 63, 195, 4, 26, 202, 18, 45, 182, 138, 84, 202, 34, 15, 209, 217, 76,
             114, 180, 67, 72, 157, 104, 241, 172, 212, 122, 18, 74, 54,
         ];
 
-        let acc = Ed25519Pair::from_seed(&pri_key);
+        let acc = Ed25519Pair::from_seed(&eph_pri_key);
         let extrinsic: OpaqueExtrinsic = create_zklogin_benchmark_extrinsic(
             self.client.as_ref(),
             acc,
@@ -147,7 +148,8 @@ pub fn create_zklogin_benchmark_extrinsic(
 
     let signature = raw_payload.using_encoded(|e| eph_signer.sign(e));
 
-    let (address_seed, input_data, max_epoch, eph_pubkey_bytes) = get_raw_data();
+    let eph_pubkey = eph_signer.public();
+    let (address_seed, input_data, max_epoch, _) = get_raw_data();
     let input = get_zklogin_inputs(input_data);
 
     let google_kid = "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781";
@@ -156,10 +158,9 @@ pub fn create_zklogin_benchmark_extrinsic(
         BoundedVec::<u8, ConstU32<256>>::truncate_from(google_kid.as_bytes().to_vec()),
     );
 
-    let eph_pubkey = <[u8; 33]>::try_from(eph_pubkey_bytes).expect("pubkey parse error");
     // construct inner zk sig
     let inner_zk_sig =
-        InnerZkSignature::new(google_jwk_id, input, max_epoch, eph_pubkey, signature.into());
+        InnerZkSignature::new(google_jwk_id, input, max_epoch, eph_pubkey.into(), signature.into());
 
     // the address that excute the call and deducting fee from
     let address = MultiAddress::from(address_seed);

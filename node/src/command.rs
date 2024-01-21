@@ -7,10 +7,9 @@ use crate::{
     },
 };
 use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
-use node_template_runtime::{Block, EXISTENTIAL_DEPOSIT};
+use node_template_runtime::{AccountId, Block};
 use sc_cli::SubstrateCli;
 use sc_service::PartialComponents;
-use sp_keyring::Sr25519Keyring;
 
 impl SubstrateCli for Cli {
     fn impl_name() -> String {
@@ -154,13 +153,15 @@ pub fn run() -> sc_cli::Result<()> {
                     }
                     BenchmarkCmd::Extrinsic(cmd) => {
                         let PartialComponents { client, .. } = service::new_partial(&config)?;
+                        let receipant = AccountId::from(sp_core::ed25519::Public([0u8; 32]));
+
                         // Register the *Remark* and *TKA* builders.
                         let ext_factory = ExtrinsicFactory(vec![
                             Box::new(ZkLoginRemarkBuilder::new(client.clone())),
                             Box::new(ZkTransferKeepAliveBuilder::new(
                                 client.clone(),
-                                Sr25519Keyring::Alice.to_account_id(),
-                                EXISTENTIAL_DEPOSIT,
+                                receipant,
+                                1200000000_u128,
                             )),
                         ]);
 
