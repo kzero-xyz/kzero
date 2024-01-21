@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     circom::{g1_affine_from_str_projective, g2_affine_from_str_projective, CircomG1, CircomG2},
-    error::ZkAuthError,
+    error::{FrParseError, ZkAuthError},
     poseidon::poseidon_zk_login,
     utils::{hash_to_field, split_to_two_frs},
 };
@@ -11,14 +11,13 @@ use ark_ff::{BigInt, PrimeField};
 use ark_groth16::Proof;
 use num_bigint::BigUint;
 use sp_core::U256;
-use sp_std::{str::FromStr, vec};
+use sp_std::vec;
 
 #[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
 pub struct ZkLoginInputs {
     pub(crate) proof_points: ZkLoginProof,
     pub(crate) iss_base64_details: Claim,
     pub(crate) header: U256,
-    pub(crate) address_seed: U256,
 }
 
 impl ZkLoginInputs {
@@ -27,31 +26,29 @@ impl ZkLoginInputs {
         &self.proof_points
     }
 
-    /// Get the address seed string.
-    pub fn get_address_seed(&self) -> U256 {
-        self.address_seed
-    }
-
     /// Calculate the poseidon hash from selected fields from inputs, along with the ephemeral pubkey.
     pub fn calculate_all_inputs_hash(
         &self,
+        address_seed: U256,
         eph_pk_bytes: &[u8],
         modulus: &[u8],
         max_epoch: u64,
     ) -> Result<Bn254Fr, ZkAuthError> {
-        let addr_seed = Fr::from_bigint(BigInt(self.address_seed.0)).unwrap();
         let (first, second) = split_to_two_frs(eph_pk_bytes)?;
-
+        let address_seed =
+            Fr::from_bigint(BigInt(address_seed.0)).ok_or(FrParseError::AddressSeedParseError)?;
         let max_epoch_f = BigUint::from(max_epoch).into();
         let index_mod_4_f = BigUint::from(self.iss_base64_details.index_mod_4).into();
-        let iss_base64_f = Fr::from_bigint(BigInt(self.iss_base64_details.value.0)).unwrap();
+        let iss_base64_f = Fr::from_bigint(BigInt(self.iss_base64_details.value.0))
+            .ok_or(FrParseError::IsBase64DetailsParseError)?;
         let header_f: Fr = Fr::from_bigint(BigInt(self.header.0)).unwrap();
 
-        let modulus_f = hash_to_field(&[BigUint::from_bytes_be(modulus)], 2048, PACK_WIDTH)?;
+        let modulus_f = hash_to_field(&[BigUint::from_bytes_be(modulus)], 2048, PACK_WIDTH)
+            .map_err(|_| FrParseError::ModuloParseError)?;
         poseidon_zk_login(vec![
             first,
             second,
-            addr_seed,
+            address_seed,
             max_epoch_f,
             iss_base64_f,
             index_mod_4_f,

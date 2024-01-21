@@ -112,7 +112,7 @@ impl frame_benchmarking_cli::ExtrinsicBuilder for ZkTransferKeepAliveBuilder {
 /// Note: Should only be used for benchmarking.
 pub fn create_zklogin_benchmark_extrinsic(
     client: &FullClient,
-    sender: sp_core::ed25519::Pair,
+    eph_signer: sp_core::ed25519::Pair,
     call: runtime::RuntimeCall,
     nonce: u32,
 ) -> runtime::UncheckedExtrinsic {
@@ -145,10 +145,10 @@ pub fn create_zklogin_benchmark_extrinsic(
         ),
     );
 
-    let signature = raw_payload.using_encoded(|e| sender.sign(e));
+    let signature = raw_payload.using_encoded(|e| eph_signer.sign(e));
 
     let (address_seed, input_data, max_epoch, eph_pubkey_bytes) = get_raw_data();
-    let input = get_zklogin_inputs(address_seed, input_data);
+    let input = get_zklogin_inputs(input_data);
 
     let google_kid = "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781";
     let google_jwk_id = JwkId::new(
@@ -161,7 +161,8 @@ pub fn create_zklogin_benchmark_extrinsic(
     let inner_zk_sig =
         InnerZkSignature::new(google_jwk_id, input, max_epoch, eph_pubkey, signature.into());
 
-    let address = MultiAddress::from(inner_zk_sig.get_onchain_address());
+    // the address that excute the call and deducting fee from
+    let address = MultiAddress::from(address_seed);
 
     let utx = runtime::UncheckedExtrinsic::new_signed(
         call,

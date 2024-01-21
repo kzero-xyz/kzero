@@ -1,9 +1,10 @@
 use crate::{
-    benchmarking::{inherent_benchmark_data, RemarkBuilder, TransferKeepAliveBuilder},
     chain_spec,
     cli::{Cli, Subcommand},
     service,
-    zklogin_benchmarking::{ZkLoginRemarkBuilder, ZkTransferKeepAliveBuilder},
+    zklogin_benchmarking::{
+        inherent_benchmark_data, ZkLoginRemarkBuilder, ZkTransferKeepAliveBuilder,
+    },
 };
 use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
 use node_template_runtime::{Block, EXISTENTIAL_DEPOSIT};

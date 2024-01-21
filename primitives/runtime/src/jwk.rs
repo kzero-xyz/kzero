@@ -130,6 +130,7 @@ pub enum JWKProvider {
 }
 
 impl JWKProvider {
+    #[allow(unused)]
     fn from_utf8_slice(s: &[u8]) -> Result<Self, ZkAuthError> {
         match s {
             b"Google" => Ok(Self::Google),

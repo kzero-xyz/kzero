@@ -8,7 +8,7 @@ use ark_ff::Zero;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use sp_core::U256;
+use sp_core::{crypto::AccountId32, U256};
 use std::str::FromStr;
 
 pub const MAX_KEY_CLAIM_NAME_LENGTH: u8 = 32;
@@ -76,19 +76,18 @@ impl From<ZkLoginInputsReaderJson> for ZkLoginInputsReader {
 }
 
 impl ZkLoginInputs {
-    pub fn from_json(value: &str, address_seed: &str) -> Result<Self, String> {
+    pub fn from_json(value: &str) -> Result<Self, String> {
         let reader: ZkLoginInputsReaderJson =
             serde_json::from_str(value).map_err(|e| e.to_string())?;
-        Self::from_reader(reader.into(), address_seed)
+        Self::from_reader(reader.into())
     }
 
     /// Initialize ZkLoginInputs from the reader
-    pub fn from_reader(reader: ZkLoginInputsReader, address_seed: &str) -> Result<Self, String> {
+    pub fn from_reader(reader: ZkLoginInputsReader) -> Result<Self, String> {
         Ok(ZkLoginInputs {
             proof_points: reader.proof_points,
             iss_base64_details: reader.iss_base64_details,
             header: reader.header,
-            address_seed: U256::from_dec_str(address_seed).map_err(|e| e.to_string())?,
         })
     }
 }
@@ -184,7 +183,7 @@ pub(crate) fn gen_address_seed_with_salt_hash(
     .to_string())
 }
 
-pub fn get_raw_data() -> (String, String, u64, Vec<u8>) {
+pub fn get_raw_data() -> (AccountId32, String, u64, Vec<u8>) {
     let user_salt = "6903439401297002981078976741241818963710729444388942281949823152082404716376301797176193848";
 
     let address_seed = gen_address_seed(
@@ -194,6 +193,10 @@ pub fn get_raw_data() -> (String, String, u64, Vec<u8>) {
         "560629365517-mt9j9arflcgi35i8hpoptr66qgo1lmfm.apps.googleusercontent.com", // clientID
     )
     .unwrap();
+
+    let address_u256 = U256::from_dec_str(&address_seed).expect("");
+    let s: [u8; 32] = address_u256.into();
+    let address_seed = AccountId32::from(s);
 
     let proof_data = r#"{
         "proof_points": {
@@ -238,7 +241,7 @@ pub fn get_raw_data() -> (String, String, u64, Vec<u8>) {
     return (address_seed, proof_data.to_owned(), max_epoch, eph_pubkey_bytes.to_vec());
 }
 
-pub fn get_zklogin_inputs(address_seed: String, proof_data: String) -> ZkLoginInputs {
-    let input = ZkLoginInputs::from_json(&proof_data, &address_seed).expect("wrong json parse");
+pub fn get_zklogin_inputs(proof_data: String) -> ZkLoginInputs {
+    let input = ZkLoginInputs::from_json(&proof_data).expect("wrong json parse");
     input
 }
