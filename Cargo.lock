@@ -10271,23 +10271,9 @@ dependencies = [
 name = "zklogin-signature"
 version = "0.1.0"
 dependencies = [
- "ark-bn254",
- "ark-crypto-primitives",
- "ark-ff",
- "ark-groth16",
- "ark-relations",
- "base64ct",
- "ff",
- "num-bigint 0.4.4",
  "parity-scale-codec",
- "poseidon-ark",
  "scale-info",
- "serde",
- "serde_json",
- "sp-core",
- "sp-io",
  "sp-runtime",
- "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.5.0)",
  "zp-zklogin",
 ]
 

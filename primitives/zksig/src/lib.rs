@@ -2,10 +2,9 @@
 
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_core::crypto::AccountId32;
 use sp_runtime::{
     traits::{IdentifyAccount, Lazy, Verify},
-    RuntimeDebug,
+    AccountId32, RuntimeDebug,
 };
 
 use zp_zklogin::Signature as ZkSignature;
