@@ -15,10 +15,9 @@ use sp_runtime::{MultiAddress, OpaqueExtrinsic};
 use sp_core::bounded_vec::BoundedVec;
 use sp_runtime::generic::Era;
 use std::{sync::Arc, time::Duration};
-use zklogin_runtime::{
-    jwk::{JWKProvider, JwkId},
+use zp_zklogin::{
     test_helper::{get_raw_data, get_zklogin_inputs},
-    zk_sig::Signature as InnerZkSignature,
+    JWKProvider, JwkId, Signature as InnerZkSignature,
 };
 
 /// Generates extrinsics for the `benchmark overhead` command.

@@ -111,10 +111,10 @@ pub fn run() -> sc_cli::Result<()> {
                 // which sub-commands it wants to support.
                 match cmd {
                     BenchmarkCmd::Pallet(cmd) => {
-                        if !cfg!(feature = "runtime-benchmarks") {
+                        if !cfg!(feature = "zksig-benchmarks") {
                             return Err(
                                 "Runtime benchmarking wasn't enabled when building the node. \
-							You can enable it with `--features runtime-benchmarks`."
+							You can enable it with `--features zksig-benchmarks`."
                                     .into(),
                             )
                         }
@@ -127,7 +127,7 @@ pub fn run() -> sc_cli::Result<()> {
                     }
                     #[cfg(not(feature = "runtime-benchmarks"))]
                     BenchmarkCmd::Storage(_) => Err(
-                        "Storage benchmarking can be enabled with `--features runtime-benchmarks`."
+                        "Storage benchmarking can be enabled with `--features zksig-benchmarks`."
                             .into(),
                     ),
                     #[cfg(feature = "runtime-benchmarks")]
@@ -177,7 +177,7 @@ pub fn run() -> sc_cli::Result<()> {
         Some(Subcommand::TryRuntime) => Err(try_runtime_cli::DEPRECATION_NOTICE.into()),
         #[cfg(not(feature = "try-runtime"))]
         Some(Subcommand::TryRuntime) => Err("TryRuntime wasn't enabled when building the node. \
-				You can enable it with `--features try-runtime`."
+				You can enable it with `--features try-zksig`."
             .into()),
         Some(Subcommand::ChainInfo(cmd)) => {
             let runner = cli.create_runner(cmd)?;

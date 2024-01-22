@@ -1,7 +1,7 @@
 //! A collection of node-specific RPC methods.
 //! Substrate provides the `sc-rpc` crate, which defines the core RPC layer
 //! used by Substrate nodes. This file extends those RPC definitions with
-//! capabilities that are specific to this project's runtime configuration.
+//! capabilities that are specific to this project's zksig configuration.
 
 #![warn(missing_docs)]
 
@@ -50,7 +50,7 @@ where
 
     // Extend this RPC with a custom API by using the following syntax.
     // `YourRpcStruct` should have a reference to a client, which is needed
-    // to call into the runtime.
+    // to call into the zksig.
     // `module.merge(YourRpcTrait::into_rpc(YourRpcStruct::new(ReferenceToClient, ...)))?;`
 
     Ok(module)

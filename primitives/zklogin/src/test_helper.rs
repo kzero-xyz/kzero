@@ -11,12 +11,12 @@ use serde_json;
 use sp_core::{crypto::AccountId32, U256};
 use std::str::FromStr;
 
-pub const MAX_KEY_CLAIM_NAME_LENGTH: u8 = 32;
-pub const MAX_KEY_CLAIM_VALUE_LENGTH: u8 = 115;
-pub const MAX_AUD_VALUE_LENGTH: u8 = 145;
+const MAX_KEY_CLAIM_NAME_LENGTH: u8 = 32;
+const MAX_KEY_CLAIM_VALUE_LENGTH: u8 = 115;
+const MAX_AUD_VALUE_LENGTH: u8 = 145;
 
-pub type CircomG1Json = [String; 3];
-pub type CircomG2Json = [[String; 2]; 3];
+type CircomG1Json = [String; 3];
+type CircomG2Json = [[String; 2]; 3];
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZkLoginProofJson {
     pub(crate) a: CircomG1Json,
@@ -92,7 +92,7 @@ impl ZkLoginInputs {
     }
 }
 
-pub fn gen_address_seed(
+fn gen_address_seed(
     salt: &str,
     name: &str,  // i.e. "sub"
     value: &str, // i.e. the sub value
@@ -102,16 +102,16 @@ pub fn gen_address_seed(
     gen_address_seed_with_salt_hash(&salt_hash.to_string(), name, value, aud)
 }
 
-pub fn to_field(val: &str) -> Result<Bn254Fr, ZkAuthError> {
+fn to_field(val: &str) -> Result<Bn254Fr, ZkAuthError> {
     Bn254Fr::from_str(val).map_err(|_| ZkAuthError::TestError(()))
 }
 
-pub fn hash_ascii_str_to_field(str: &str, max_size: u8) -> ZkAuthResult<Bn254Fr> {
+fn hash_ascii_str_to_field(str: &str, max_size: u8) -> ZkAuthResult<Bn254Fr> {
     let str_padded = str_to_padded_char_codes(str, max_size)?;
     hash_to_field(&str_padded, 8, PACK_WIDTH)
 }
 
-pub fn hash_to_field(input: &[BigUint], in_width: u16, pack_width: u8) -> ZkAuthResult<Bn254Fr> {
+fn hash_to_field(input: &[BigUint], in_width: u16, pack_width: u8) -> ZkAuthResult<Bn254Fr> {
     let packed = convert_base(input, in_width, pack_width)?;
     poseidon_zk_login(packed)
 }
@@ -168,7 +168,7 @@ fn pad_with_zeroes(in_arr: Vec<BigUint>, out_count: u8) -> ZkAuthResult<Vec<BigU
 }
 
 /// Same as [`gen_address_seed`] but takes the poseidon hash of the salt as input instead of the salt.
-pub(crate) fn gen_address_seed_with_salt_hash(
+fn gen_address_seed_with_salt_hash(
     salt_hash: &str,
     name: &str,  // i.e. "sub"
     value: &str, // i.e. the sub value

@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "node",
-    "primitives/runtime",
+    "primitives/zksig",
+    "primitives/zklogin",
     "runtime",
 ]
 resolver = "2"

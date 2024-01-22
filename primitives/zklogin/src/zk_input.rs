@@ -1,16 +1,18 @@
-use super::*;
 use crate::{
     circom::{g1_affine_from_str_projective, g2_affine_from_str_projective, CircomG1, CircomG2},
     error::{FrParseError, ZkAuthError},
     poseidon::poseidon_zk_login,
     utils::{hash_to_field, split_to_two_frs},
+    PACK_WIDTH,
 };
 use ark_bn254::Fr;
 pub use ark_bn254::{Bn254, Fr as Bn254Fr};
 use ark_ff::{BigInt, PrimeField};
 use ark_groth16::Proof;
 use num_bigint::BigUint;
-use sp_core::U256;
+use scale_codec::{Decode, Encode, MaxEncodedLen};
+use scale_info::TypeInfo;
+use sp_core::{RuntimeDebug, U256};
 use sp_std::vec;
 
 #[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]

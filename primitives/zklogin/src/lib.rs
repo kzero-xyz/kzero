@@ -1,16 +1,39 @@
-use super::*;
+#![cfg_attr(not(feature = "std"), no_std)]
+
 use crate::{
-    error::ZkAuthResult,
-    jwk::{get_modulo, JwkId},
+    jwk::get_modulo,
     pvk::{prod_pvk, test_pvk},
     zk_input::{Bn254Fr, ZkLoginInputs},
 };
 use ark_bn254::Bn254;
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::{Groth16, Proof};
-pub use base64ct::{Base64UrlUnpadded, Encoding};
-use sp_core::U256;
+use base64ct::{Base64UrlUnpadded, Encoding};
+use scale_codec::{Decode, Encode, MaxEncodedLen};
+use scale_info::TypeInfo;
+use sp_core::{crypto::AccountId32, U256};
+use sp_runtime::{
+    traits::{IdentifyAccount, Lazy, Verify},
+    RuntimeDebug,
+};
 
+pub use error::{ZkAuthError, ZkAuthResult};
+pub use jwk::{JWKProvider, JwkId};
+
+mod circom;
+mod error;
+mod jwk;
+mod poseidon;
+mod pvk;
+#[cfg(feature = "std")]
+pub mod test_helper;
+#[cfg(test)]
+mod tests;
+mod utils;
+mod zk_input;
+
+pub const PACK_WIDTH: u8 = 248;
+pub const EPH_PUB_KEY_LEN: usize = 32;
 #[derive(Debug, Clone)]
 pub enum ZkLoginEnv {
     /// Use the secure global verifying key derived from ceremony.
@@ -77,7 +100,7 @@ where
     }
 }
 
-pub fn verify_zk_login(
+fn verify_zk_login(
     address_seed: U256,
     input: &ZkLoginInputs,
     jwk_id: &JwkId,

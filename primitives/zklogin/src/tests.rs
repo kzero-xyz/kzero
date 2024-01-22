@@ -1,7 +1,9 @@
 use crate::{
     jwk::{JWKProvider, JwkId},
     test_helper::{get_raw_data, get_zklogin_inputs},
+    verify_zk_login,
     zk_sig::{verify_zk_login, ZkLoginEnv},
+    ZkLoginEnv,
 };
 use sp_core::{bounded::BoundedVec, crypto::Pair as TPair, ed25519::Pair, ConstU32, U256};
 

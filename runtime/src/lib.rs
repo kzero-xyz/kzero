@@ -43,7 +43,7 @@ use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
-use zklogin_runtime::ZkMultiSignature;
+use zklogin_signature::ZkMultiSignature;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -65,7 +65,7 @@ pub type Nonce = u32;
 pub type Hash = sp_core::H256;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
-/// the specifics of the runtime. They can then be made to be agnostic over specific formats
+/// the specifics of the zksig. They can then be made to be agnostic over specific formats
 /// of data like extrinsics, allowing for them to continue syncing the network through upgrades
 /// to even the core data structures.
 pub mod opaque {
@@ -88,15 +88,15 @@ pub mod opaque {
     }
 }
 
-// To learn more about runtime versioning, see:
+// To learn more about zksig versioning, see:
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("node-template"),
     impl_name: create_runtime_str!("node-template"),
     authoring_version: 1,
-    // The version of the runtime specification. A full node will not attempt to use its native
-    //   runtime in substitute for the on-chain Wasm runtime unless all of `spec_name`,
+    // The version of the zksig specification. A full node will not attempt to use its native
+    //   zksig in substitute for the on-chain Wasm zksig unless all of `spec_name`,
     //   `spec_version`, and `authoring_version` are the same between Wasm and native.
     // This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
     //   the compatible custom types.
@@ -124,7 +124,7 @@ pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
 
-/// The version information used to identify this runtime when compiled natively.
+/// The version information used to identify this zksig when compiled natively.
 #[cfg(feature = "std")]
 pub fn native_version() -> NativeVersion {
     NativeVersion { runtime_version: VERSION, can_author_with: Default::default() }
@@ -151,7 +151,7 @@ parameter_types! {
 /// but overridden as needed.
 #[derive_impl(frame_system::config_preludes::SolochainDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Runtime {
-    /// The block type for the runtime.
+    /// The block type for the zksig.
     type Block = Block;
     /// Block & extrinsics weights: base values and limits.
     type BlockWeights = BlockWeights;
@@ -165,9 +165,9 @@ impl frame_system::Config for Runtime {
     type Hash = Hash;
     /// Maximum number of block number to block hash mappings to keep (oldest pruned first).
     type BlockHashCount = BlockHashCount;
-    /// The weight of database operations that the runtime can invoke.
+    /// The weight of database operations that the zksig can invoke.
     type DbWeight = RocksDbWeight;
-    /// Version of the runtime.
+    /// Version of the zksig.
     type Version = Version;
     /// The data to be stored in an account.
     type AccountData = pallet_balances::AccountData<Balance>;
@@ -247,7 +247,7 @@ impl pallet_sudo::Config for Runtime {
     type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
 }
 
-// Create the runtime by composing the FRAME pallets that were previously configured.
+// Create the zksig by composing the FRAME pallets that were previously configured.
 construct_runtime!(
     pub struct Runtime {
         System: frame_system,
@@ -262,9 +262,9 @@ construct_runtime!(
 
 /// The address format for describing accounts.
 pub type Address = sp_runtime::MultiAddress<AccountId, ()>;
-/// Block header type as expected by this runtime.
+/// Block header type as expected by this zksig.
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
-/// Block type as expected by this runtime.
+/// Block type as expected by this zksig.
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 /// The SignedExtension to the basic transaction logic.
 pub type SignedExtra = (
@@ -278,13 +278,13 @@ pub type SignedExtra = (
     pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
 );
 
-/// All migrations of the runtime, aside from the ones declared in the pallets.
+/// All migrations of the zksig, aside from the ones declared in the pallets.
 ///
 /// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 #[allow(unused_parens)]
 type Migrations = ();
 
-/// Unchecked extrinsic type as expected by this runtime.
+/// Unchecked extrinsic type as expected by this zksig.
 pub type UncheckedExtrinsic =
     generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
 /// The payload being signed in transactions.
@@ -482,7 +482,7 @@ impl_runtime_apis! {
         }
     }
 
-    #[cfg(feature = "runtime-benchmarks")]
+    #[cfg(feature = "zksig-benchmarks")]
     impl frame_benchmarking::Benchmark<Block> for Runtime {
         fn benchmark_metadata(extra: bool) -> (
             Vec<frame_benchmarking::BenchmarkList>,
@@ -523,7 +523,7 @@ impl_runtime_apis! {
         }
     }
 
-    #[cfg(feature = "try-runtime")]
+    #[cfg(feature = "try-zksig")]
     impl frame_try_runtime::TryRuntime<Block> for Runtime {
         fn on_runtime_upgrade(checks: frame_try_runtime::UpgradeCheckSelect) -> (Weight, Weight) {
             // NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to

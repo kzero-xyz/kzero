@@ -5,7 +5,6 @@ use sp_core::U256;
 
 /// A G1 point in BN254 serialized as a vector of three strings which is the canonical decimal
 /// representation of the projective coordinates in Fq.
-
 pub type CircomG1 = [U256; 3];
 
 /// A G2 point in BN254 serialized as a vector of three vectors each being a vector of two strings
@@ -16,7 +15,7 @@ pub type CircomG2 = [[U256; 2]; 3];
 /// Deserialize a G1 projective point in BN254 serialized as a vector of three strings into an affine
 /// G1 point in arkworks format. Return an error if the input is not a vector of three strings or if
 /// any of the strings cannot be parsed as a field element.
-pub fn g1_affine_from_str_projective(s: &CircomG1) -> ZkAuthResult<G1Affine> {
+pub(crate) fn g1_affine_from_str_projective(s: &CircomG1) -> ZkAuthResult<G1Affine> {
     Ok(G1Projective::new_unchecked(
         Fq::from_bigint(BigInt(s[0].0)).ok_or(ZkAuthError::FqParseError)?,
         Fq::from_bigint(BigInt(s[1].0)).ok_or(ZkAuthError::FqParseError)?,
@@ -29,7 +28,7 @@ pub fn g1_affine_from_str_projective(s: &CircomG1) -> ZkAuthResult<G1Affine> {
 /// vectors each being a vector of two strings into an affine G2 point in arkworks format. Return an
 /// error if the input is not a vector of the right format or if any of the strings cannot be parsed
 /// as a field element.
-pub fn g2_affine_from_str_projective(s: &CircomG2) -> ZkAuthResult<G2Affine> {
+pub(crate) fn g2_affine_from_str_projective(s: &CircomG2) -> ZkAuthResult<G2Affine> {
     Ok(G2Projective::new_unchecked(
         Fq2::new(
             Fq::from_bigint(BigInt(s[0][0].0)).ok_or(ZkAuthError::FqParseError)?,

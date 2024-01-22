@@ -189,7 +189,7 @@ pub struct JWK {
     pub alg: &'static str,
 }
 
-pub fn get_modulo(jwk_id: &JwkId) -> ZkAuthResult<JWK> {
+pub(crate) fn get_modulo(jwk_id: &JwkId) -> ZkAuthResult<JWK> {
     let jwk_list = match jwk_id.provider {
         JWKProvider::Google => GOOGLE_JWK_LIST.to_vec(),
         JWKProvider::Twitch => TWITCH_JWK_LIST.to_vec(),
