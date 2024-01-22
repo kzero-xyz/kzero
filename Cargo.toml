@@ -4,6 +4,7 @@ members = [
     "primitives/zksig",
     "primitives/zklogin",
     "runtime",
+    "frame/zklogin",
 ]
 resolver = "2"
 
