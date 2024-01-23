@@ -13,10 +13,7 @@ use sp_core::{ed25519, Pair, H256};
 use sp_runtime::{
     generic,
     generic::{CheckedExtrinsic, UncheckedExtrinsic},
-    traits::{
-        BlakeTwo256, Checkable, DispatchInfoOf, IdentifyAccount, IdentityLookup, SignedExtension,
-        Verify,
-    },
+    traits::{BlakeTwo256, Checkable, DispatchInfoOf, IdentifyAccount, SignedExtension, Verify},
     transaction_validity::TransactionValidityError,
     BuildStorage, MultiAddress, MultiSignature,
 };
@@ -56,10 +53,10 @@ impl SignedExtension for MockExtra {
 
     fn pre_dispatch(
         self,
-        who: &Self::AccountId,
-        call: &Self::Call,
-        info: &DispatchInfoOf<Self::Call>,
-        len: usize,
+        _who: &Self::AccountId,
+        _call: &Self::Call,
+        _info: &DispatchInfoOf<Self::Call>,
+        _len: usize,
     ) -> Result<Self::Pre, TransactionValidityError> {
         Ok(())
     }

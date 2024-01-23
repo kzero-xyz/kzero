@@ -8,7 +8,7 @@ use frame_support::dispatch::{
     DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo, PostDispatchInfo,
 };
 use sp_runtime::{
-    traits::{Applyable, BlockNumberProvider, Checkable, Dispatchable, StaticLookup},
+    traits::{Applyable, BlockNumberProvider, Checkable, Dispatchable, Extrinsic, StaticLookup},
     transaction_validity::{InvalidTransaction, TransactionValidityError, UnknownTransaction},
 };
 use sp_std::prelude::*;
@@ -36,7 +36,7 @@ pub mod pallet {
         /// Same as `Executive`, required by `Checkable` for `Self::Extrinsic`
         type Context: Default;
 
-        type Extrinsic: sp_runtime::traits::Extrinsic<Call = Self::RuntimeCall>
+        type Extrinsic: Extrinsic<Call = Self::RuntimeCall>
             + Checkable<Self::Context, Checked = Self::CheckedExtrinsic>
             + Codec
             + TypeInfo
@@ -55,7 +55,7 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        No,
+        ZkLoginExecuted { result: DispatchResult },
     }
 
     #[pallet::error]
@@ -100,7 +100,10 @@ pub mod pallet {
             ensure!(expire_at <= now, Error::<T>::EphKeyExpired);
 
             // execute real call
-            Executive::<T>::apply_extrinsic(uxt, address_seed)
+            let r = Executive::<T>::apply_extrinsic(uxt, address_seed);
+            let exec_res: DispatchResult = r.map(|_| ()).map_err(|e| e.error);
+            Self::deposit_event(Event::ZkLoginExecuted { result: exec_res });
+            r
         }
     }
 
@@ -128,13 +131,24 @@ pub mod pallet {
                     jwk_id,
                     expire_at,
                     eph_pubkey,
-                    ..
                 } => {
-                    let xt = uxt.clone().check(&T::Context::default())?;
-                    // TODO we think we only support Normal transaction by filter dispatchinfo.class
-                    // TODO we only allow signed extrinsic, others should deny
-
+                    // only signed extrinsic is allowed
+                    if !uxt.is_signed().unwrap_or(false) {
+                        return InvalidTransaction::Call.into();
+                    }
                     let address_seed = T::Lookup::lookup(address_seed.clone())?;
+
+                    let encoded = uxt.encode();
+                    let encoded_len = encoded.len();
+
+                    let mut xt = uxt.clone().check(&T::Context::default())?;
+                    xt.replace_sender(address_seed.clone());
+                    // Decode parameters and dispatch
+                    let dispatch_info = xt.get_dispatch_info();
+                    // mandatory extrinsic is not allowed to use zklogin
+                    if dispatch_info.class == DispatchClass::Mandatory {
+                        return InvalidTransaction::BadMandatory.into();
+                    }
 
                     // TODO remove this!
                     let address_seed = U256::from_big_endian(address_seed.as_ref());
@@ -149,14 +163,10 @@ pub mod pallet {
                         &ZkLoginEnv::Prod,
                     )
                     .map_err(|_| InvalidTransaction::BadProof)?;
-                    // TODO
-                    // xt.replace_signer()
-                    // xt.validate::<UnsignedValidator>(source, &dispatch_info, encoded_len)
-                    // TODO;
-                    Ok(ValidTransaction::default())
+
+                    xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
                 }
-                // TODO use other error type
-                _ => Err(UnknownTransaction::Custom(0).into()),
+                _ => Err(InvalidTransaction::Call.into()),
             }
         }
     }
@@ -183,8 +193,6 @@ where
         let dispatch_info = xt.get_dispatch_info();
         let r = Applyable::apply::<T::UnsignedValidator>(xt, &dispatch_info, encoded_len)
             .map_err(Error::<T>::from)?;
-
-        // todo deposit event
 
         // For we has checked the `dispatch_info.class` in `validate_unsigned`, so the check at here is not
         // necessary. We keep this to be same implementation in `Executive`.
