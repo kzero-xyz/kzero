@@ -1,0 +1,18 @@
+[package]
+name = "zklogin-support"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sp-runtime = { workspace = true }
+
+[features]
+default = ["std"]
+std = [
+    "sp-runtime/std",
+]

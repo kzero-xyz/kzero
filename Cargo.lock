@@ -5140,12 +5140,14 @@ dependencies = [
  "frame-support",
  "frame-system",
  "log",
+ "pallet-balances",
  "parity-scale-codec",
  "scale-info",
  "sp-core",
  "sp-io",
  "sp-runtime",
  "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.5.0)",
+ "zklogin-support",
  "zp-zklogin",
 ]
 
@@ -10292,6 +10294,13 @@ dependencies = [
  "scale-info",
  "sp-runtime",
  "zp-zklogin",
+]
+
+[[package]]
+name = "zklogin-support"
+version = "0.1.0"
+dependencies = [
+ "sp-runtime",
 ]
 
 [[package]]

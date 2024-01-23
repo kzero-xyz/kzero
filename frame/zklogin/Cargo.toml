@@ -23,7 +23,11 @@ sp-io = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 # zkloign
+zklogin-support = { path = "../../primitives/zklogin-support", default-features = false }
 zp-zklogin = { path = "../../primitives/zklogin", default-features = false }
+
+[dev-dependencies]
+pallet-balances = { workspace = true, features = ["default"] }
 
 [features]
 default = ["std"]
@@ -42,6 +46,7 @@ std = [
     "sp-runtime/std",
     # zklogin
     "zp-zklogin/std",
+    "zklogin-support/std",
 ]
 
 runtime-benchmarks = [

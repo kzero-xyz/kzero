@@ -258,6 +258,8 @@ impl pallet_zklogin::Config for Runtime {
     type UnsignedValidator = Runtime;
 
     type Context = frame_system::ChainContext<Runtime>;
+
+    type BlockNumberProvider = System;
 }
 
 // Create the zksig by composing the FRAME pallets that were previously configured.

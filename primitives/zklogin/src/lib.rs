@@ -3,7 +3,7 @@
 use crate::{
     jwk::get_modulo,
     pvk::{prod_pvk, test_pvk},
-    zk_input::{Bn254Fr, ZkLoginInputs},
+    zk_input::Bn254Fr,
 };
 use ark_bn254::Bn254;
 use ark_crypto_primitives::snark::SNARK;
@@ -19,6 +19,7 @@ use sp_runtime::{
 
 pub use error::{ZkAuthError, ZkAuthResult};
 pub use jwk::{JWKProvider, JwkId};
+pub use zk_input::ZkLoginInputs;
 
 mod circom;
 mod error;
@@ -52,7 +53,7 @@ impl Default for ZkLoginEnv {
 pub struct Signature<S> {
     source: JwkId,
     input: ZkLoginInputs,
-    max_epoch: u64,
+    max_epoch: u32,
     eph_pubkey: [u8; EPH_PUB_KEY_LEN],
     sig: S,
 }
@@ -61,7 +62,7 @@ impl<S> Signature<S> {
     pub fn new(
         source: JwkId,
         input: ZkLoginInputs,
-        max_epoch: u64,
+        max_epoch: u32,
         eph_pubkey: [u8; 32],
         sig: S,
     ) -> Self {
@@ -100,11 +101,11 @@ where
     }
 }
 
-fn verify_zk_login(
+pub fn verify_zk_login(
     address_seed: U256,
     input: &ZkLoginInputs,
     jwk_id: &JwkId,
-    max_epoch: u64,
+    max_epoch: u32,
     eph_pubkey_bytes: &[u8],
     env: &ZkLoginEnv,
 ) -> ZkAuthResult<()> {
