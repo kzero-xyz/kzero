@@ -1,4 +1,5 @@
 use crate::{Call as ZkLoginCall, Pallet};
+use frame_executive::Executive;
 use frame_support::{
     assert_ok,
     dispatch::RawOrigin,
@@ -9,7 +10,7 @@ use frame_support::{
 };
 use pallet_balances::Call as BalancesCall;
 use scale_codec::{Decode, Encode};
-use sp_core::{ed25519, Pair, H256};
+use sp_core::{crypto::AccountId32, ed25519, Pair, H256};
 use sp_runtime::{
     generic,
     generic::{CheckedExtrinsic, UncheckedExtrinsic},
@@ -18,9 +19,9 @@ use sp_runtime::{
     BuildStorage, MultiAddress, MultiSignature,
 };
 use std::str::FromStr;
-use zp_zklogin::{
+use zklogin_support::{
     test_helper::{get_raw_data, get_zklogin_inputs},
-    JWKProvider, JwkId,
+    JWKProvider, JwkId, ZkMaterial,
 };
 
 /// An index to a block.
@@ -61,6 +62,8 @@ impl SignedExtension for MockExtra {
         Ok(())
     }
 }
+
+type MockExecutive = Executive<Test, Block, Context, Test, AllPalletsWithSystem, ()>;
 
 frame_support::construct_runtime!(
     pub enum Test
@@ -167,7 +170,10 @@ fn basic_setup_works() {
 
 #[test]
 fn validate_unsigned_should_work() {
-    let (address_seed, input_data, max_epoch, eph_pubkey_bytes) = get_raw_data();
+    use sp_runtime::traits::ValidateUnsigned;
+    let source = sp_runtime::transaction_validity::TransactionSource::External;
+
+    let (address_seed, input_data, expire_at, eph_pubkey) = get_raw_data();
     let inputs = get_zklogin_inputs(input_data);
 
     let signing_key = eph_key();
@@ -178,8 +184,7 @@ fn validate_unsigned_should_work() {
         BoundedVec::<u8, ConstU32<256>>::truncate_from(google_kid.as_bytes().to_vec()),
     );
 
-    use sp_runtime::traits::ValidateUnsigned;
-    let source = sp_runtime::transaction_validity::TransactionSource::External;
+    let zk_material = ZkMaterial::new(google_jwk_id, inputs, expire_at, eph_pubkey);
 
     // construct uxt
     let dest = AccountId::from([0u8; 32]);
@@ -200,17 +205,28 @@ fn validate_unsigned_should_work() {
     let final_call = ZkLoginCall::submit_zklogin_unsigned {
         uxt: Box::new(uxt),
         address_seed: address_seed.into(),
-        inputs,
-        jwk_id: google_jwk_id,
-        expire_at: max_epoch,
-        eph_pubkey: eph_pubkey_bytes,
+        zk_material,
     };
+
+    let outer_uxt = UncheckedExtrinsic::<
+        MultiAddress<AccountId, ()>,
+        RuntimeCall,
+        MultiSignature,
+        MockExtra,
+    >::new_unsigned(final_call.clone().into());
 
     new_test_ext().execute_with(|| {
         System::set_block_number(1000);
         assert!(Pallet::<Test>::validate_unsigned(source, &final_call).is_ok());
+
+        // execute through call.dispatch
         assert_ok!(final_call.dispatch_bypass_filter(RawOrigin::None.into()));
         assert_eq!(Balances::free_balance(&zk_address(),), 900);
         assert_eq!(Balances::free_balance(&dest), 100);
-    })
+
+        // execute through `apply_extrinsic`
+        assert_ok!(MockExecutive::apply_extrinsic(outer_uxt));
+        assert_eq!(Balances::free_balance(&zk_address(),), 800);
+        assert_eq!(Balances::free_balance(&dest), 200);
+    });
 }

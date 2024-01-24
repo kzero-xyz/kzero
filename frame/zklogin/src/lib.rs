@@ -12,8 +12,8 @@ use sp_runtime::{
     transaction_validity::{InvalidTransaction, TransactionValidityError, UnknownTransaction},
 };
 use sp_std::prelude::*;
-use zklogin_support::ReplaceSender;
-use zp_zklogin::{verify_zk_login, ZkLoginInputs};
+use zklogin_runtime::ReplaceSender;
+use zklogin_support::ZkMaterial;
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
@@ -24,8 +24,7 @@ pub mod pallet {
     use super::*;
     use frame_support::{dispatch::PostDispatchInfo, pallet_prelude::*};
     use frame_system::pallet_prelude::*;
-    use sp_core::{crypto::AccountId32, U256};
-    use zp_zklogin::{JwkId, ZkLoginEnv, EPH_PUB_KEY_LEN};
+    use sp_core::crypto::AccountId32;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
@@ -86,17 +85,14 @@ pub mod pallet {
             origin: OriginFor<T>,
             uxt: Box<T::Extrinsic>,
             address_seed: AccountIdLookupOf<T>,
-            _inputs: ZkLoginInputs,
-            _jwk_id: JwkId,
-            expire_at: u32,
-            _eph_pubkey: [u8; EPH_PUB_KEY_LEN],
+            zk_material: ZkMaterial,
         ) -> DispatchResultWithPostInfo {
             // make sure this call is unsigned signed
             ensure_none(origin)?;
 
-            // check ehpkey's expiration time
+            // check ephemeral key's expiration time
             let now = T::BlockNumberProvider::current_block_number();
-            let expire_at: BlockNumberFor<T> = expire_at.into();
+            let expire_at: BlockNumberFor<T> = zk_material.get_ephkey_expire_at().into();
             ensure!(expire_at <= now, Error::<T>::EphKeyExpired);
 
             // execute real call
@@ -124,14 +120,7 @@ pub mod pallet {
 
             // verify signature
             match call {
-                Call::submit_zklogin_unsigned {
-                    uxt,
-                    address_seed,
-                    inputs,
-                    jwk_id,
-                    expire_at,
-                    eph_pubkey,
-                } => {
+                Call::submit_zklogin_unsigned { uxt, address_seed, zk_material } => {
                     // only signed extrinsic is allowed
                     if !uxt.is_signed().unwrap_or(false) {
                         return InvalidTransaction::Call.into();
@@ -140,29 +129,26 @@ pub mod pallet {
 
                     let encoded = uxt.encode();
                     let encoded_len = encoded.len();
-
+                    // Check Signature
                     let mut xt = uxt.clone().check(&T::Context::default())?;
+
+                    // IMPORTANT
+                    // replace sender in CheckedExtrinsic
+                    // This is due to zkLogin's mechanism, it uses `ephemeral key` to sign and submit tx
+                    // while the real transaction is executed and transaction fee paid
+                    // through the `zklogin_address` that is derived from JWT
                     xt.replace_sender(address_seed.clone());
                     // Decode parameters and dispatch
                     let dispatch_info = xt.get_dispatch_info();
-                    // mandatory extrinsic is not allowed to use zklogin
+                    // Check dispatch_class: mandatory extrinsic is not allowed to use zklogin-support
                     if dispatch_info.class == DispatchClass::Mandatory {
                         return InvalidTransaction::BadMandatory.into();
                     }
 
-                    // TODO remove this!
-                    let address_seed = U256::from_big_endian(address_seed.as_ref());
-
                     // validate zk proof
-                    verify_zk_login(
-                        address_seed,
-                        inputs,
-                        jwk_id,
-                        *expire_at,
-                        eph_pubkey,
-                        &ZkLoginEnv::Prod,
-                    )
-                    .map_err(|_| InvalidTransaction::BadProof)?;
+                    zk_material
+                        .verify_zk_login(&address_seed)
+                        .map_err(|_| InvalidTransaction::BadProof)?;
 
                     xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
                 }

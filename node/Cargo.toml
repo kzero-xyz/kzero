@@ -58,9 +58,8 @@ node-template-runtime = { workspace = true, features = ["default"] }
 # CLI-specific dependencies
 try-runtime-cli = { workspace = true, optional = true }
 
-# zklogin
-zklogin-signature = { path = "../primitives/zksig", features = ["default"] }
-zp-zklogin = { path = "../primitives/zklogin", features = ["default"] }
+# zklogin-support
+zklogin-support = { path = "../primitives/zklogin-support", features = ["default"] }
 
 hex = "0.4.3"
 

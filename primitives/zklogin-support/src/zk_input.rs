@@ -3,7 +3,7 @@ use crate::{
     error::{FrParseError, ZkAuthError},
     poseidon::poseidon_zk_login,
     utils::{hash_to_field, split_to_two_frs},
-    PACK_WIDTH,
+    PubKey, PACK_WIDTH,
 };
 use ark_bn254::Fr;
 pub use ark_bn254::{Bn254, Fr as Bn254Fr};
@@ -32,7 +32,8 @@ impl ZkLoginInputs {
     pub fn calculate_all_inputs_hash(
         &self,
         address_seed: U256,
-        eph_pk_bytes: &[u8],
+        // TODO; change this to [u8; 32]
+        eph_pk_bytes: &PubKey,
         modulus: &[u8],
         max_epoch: u32,
     ) -> Result<Bn254Fr, ZkAuthError> {

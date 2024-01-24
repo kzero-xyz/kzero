@@ -8,7 +8,7 @@ use ark_ff::Zero;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use sp_core::{crypto::AccountId32, U256};
+use sp_core::{crypto::AccountId32, ed25519::Pair as Ed25519Pair, Pair, U256};
 use std::str::FromStr;
 
 const MAX_KEY_CLAIM_NAME_LENGTH: u8 = 32;
@@ -183,6 +183,15 @@ fn gen_address_seed_with_salt_hash(
     .to_string())
 }
 
+pub fn get_test_eph_key() -> Ed25519Pair {
+    let pri_key = [
+        251, 112, 167, 63, 195, 4, 26, 202, 18, 45, 182, 138, 84, 202, 34, 15, 209, 217, 76, 114,
+        180, 67, 72, 157, 104, 241, 172, 212, 122, 18, 74, 54,
+    ];
+
+    Pair::from_seed(&pri_key)
+}
+
 pub fn get_raw_data() -> (AccountId32, String, u32, [u8; 32]) {
     let user_salt = "6903439401297002981078976741241818963710729444388942281949823152082404716376301797176193848";
 
@@ -233,10 +242,7 @@ pub fn get_raw_data() -> (AccountId32, String, u32, [u8; 32]) {
     }"#;
 
     let max_epoch: u32 = 834;
-    let eph_pubkey_bytes: [u8; 32] = [
-        250, 253, 29, 158, 37, 168, 126, 150, 82, 151, 106, 123, 176, 108, 46, 71, 119, 194, 229,
-        57, 217, 15, 62, 231, 182, 177, 43, 154, 69, 17, 138, 136,
-    ];
+    let eph_pubkey_bytes: [u8; 32] = get_test_eph_key().public().0;
 
     return (address_seed, proof_data.to_owned(), max_epoch, eph_pubkey_bytes);
 }

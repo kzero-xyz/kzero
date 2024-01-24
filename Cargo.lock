@@ -4748,8 +4748,7 @@ dependencies = [
  "substrate-build-script-utils",
  "substrate-frame-rpc-system",
  "try-runtime-cli",
- "zklogin-signature",
- "zp-zklogin",
+ "zklogin-support",
 ]
 
 [[package]]
@@ -4789,7 +4788,7 @@ dependencies = [
  "sp-transaction-pool",
  "sp-version",
  "substrate-wasm-builder",
- "zklogin-signature",
+ "zklogin-runtime",
 ]
 
 [[package]]
@@ -5137,6 +5136,7 @@ dependencies = [
 name = "pallet-zklogin"
 version = "0.1.0"
 dependencies = [
+ "frame-executive",
  "frame-support",
  "frame-system",
  "log",
@@ -5147,8 +5147,8 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.5.0)",
+ "zklogin-runtime",
  "zklogin-support",
- "zp-zklogin",
 ]
 
 [[package]]
@@ -10287,24 +10287,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "zklogin-signature"
+name = "zklogin-runtime"
 version = "0.1.0"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
  "sp-runtime",
- "zp-zklogin",
+ "zklogin-support",
 ]
 
 [[package]]
 name = "zklogin-support"
-version = "0.1.0"
-dependencies = [
- "sp-runtime",
-]
-
-[[package]]
-name = "zp-zklogin"
 version = "0.1.0"
 dependencies = [
  "ark-bn254",

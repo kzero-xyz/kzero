@@ -1,11 +1,10 @@
 [workspace]
 members = [
     "node",
-    "primitives/zksig",
-    "primitives/zklogin",
+    "primitives/zklogin-support",
     "runtime",
     "frame/zklogin",
-    "primitives/zklogin-support",
+    "primitives/zklogin-runtime",
 ]
 resolver = "2"
 

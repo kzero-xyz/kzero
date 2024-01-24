@@ -1,5 +1,3 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_runtime::{
@@ -7,7 +5,7 @@ use sp_runtime::{
     AccountId32, RuntimeDebug,
 };
 
-use zp_zklogin::Signature as ZkSignature;
+use zklogin_support::Signature as ZkSignature;
 
 /// Wrapped MultiSignature that is compatible with Substrate
 #[derive(Eq, PartialEq, Clone, Encode, Decode, MaxEncodedLen, RuntimeDebug, TypeInfo)]

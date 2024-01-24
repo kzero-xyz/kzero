@@ -1,4 +1,4 @@
-use crate::{error::ZkAuthError, poseidon::poseidon_zk_login, zk_input::Bn254Fr};
+use crate::{error::ZkAuthError, poseidon::poseidon_zk_login, zk_input::Bn254Fr, PubKey};
 use num_bigint::BigUint;
 use sp_std::{vec, vec::Vec};
 
@@ -56,12 +56,14 @@ fn big_int_array_to_bits(arr: &[BigUint], int_size: usize) -> Vec<u8> {
     bitarray
 }
 
-pub fn split_to_two_frs(eph_pk_bytes: &[u8]) -> Result<(Bn254Fr, Bn254Fr), ZkAuthError> {
+/// Split the pubkey into 2 slice
+/// Note: eph_pk_bytes is a 32-bytes long fixed u8 array
+/// No need to worry about the spill
+pub fn split_to_two_frs(eph_pk_bytes: &PubKey) -> Result<(Bn254Fr, Bn254Fr), ZkAuthError> {
     // Split the bytes deterministically such that the first element contains the first 128
     // bits of the hash, and the second element contains the latter ones.
     let (first_half, second_half) = eph_pk_bytes.split_at(eph_pk_bytes.len() - 16);
     let first_bigint = BigUint::from_bytes_be(first_half);
-    // TODO: this is not safe if the buffer is large. Can we use a fixed size array for eph_pk_bytes?
     let second_bigint = BigUint::from_bytes_be(second_half);
 
     let eph_public_key_0 = Bn254Fr::from(first_bigint);

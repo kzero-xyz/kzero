@@ -8,15 +8,15 @@ use node_template_runtime as runtime;
 use runtime::{AccountId, Balance, BalancesCall, SystemCall};
 use sc_cli::Result;
 use sc_client_api::BlockBackend;
-use sp_core::{ed25519::Pair as Ed25519Pair, ConstU32, Encode, Pair};
+use sp_core::{ConstU32, Encode, Pair};
 use sp_inherents::{InherentData, InherentDataProvider};
 use sp_runtime::{MultiAddress, OpaqueExtrinsic};
 
 use sp_core::bounded_vec::BoundedVec;
 use sp_runtime::generic::Era;
 use std::{sync::Arc, time::Duration};
-use zp_zklogin::{
-    test_helper::{get_raw_data, get_zklogin_inputs},
+use zklogin_support::{
+    test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs},
     JWKProvider, JwkId, Signature as InnerZkSignature,
 };
 
@@ -44,11 +44,7 @@ impl frame_benchmarking_cli::ExtrinsicBuilder for ZkLoginRemarkBuilder {
     }
 
     fn build(&self, nonce: u32) -> std::result::Result<OpaqueExtrinsic, &'static str> {
-        let pri_key = [
-            251, 112, 167, 63, 195, 4, 26, 202, 18, 45, 182, 138, 84, 202, 34, 15, 209, 217, 76,
-            114, 180, 67, 72, 157, 104, 241, 172, 212, 122, 18, 74, 54,
-        ];
-        let acc = Ed25519Pair::from_seed(&pri_key);
+        let acc = get_test_eph_key();
         let extrinsic: OpaqueExtrinsic = create_zklogin_benchmark_extrinsic(
             self.client.as_ref(),
             acc,
@@ -88,12 +84,7 @@ impl frame_benchmarking_cli::ExtrinsicBuilder for ZkTransferKeepAliveBuilder {
 
     fn build(&self, nonce: u32) -> std::result::Result<OpaqueExtrinsic, &'static str> {
         // hardcode eph private key
-        let eph_pri_key = [
-            251, 112, 167, 63, 195, 4, 26, 202, 18, 45, 182, 138, 84, 202, 34, 15, 209, 217, 76,
-            114, 180, 67, 72, 157, 104, 241, 172, 212, 122, 18, 74, 54,
-        ];
-
-        let acc = Ed25519Pair::from_seed(&eph_pri_key);
+        let acc = get_test_eph_key();
         let extrinsic: OpaqueExtrinsic = create_zklogin_benchmark_extrinsic(
             self.client.as_ref(),
             acc,
