@@ -3,7 +3,7 @@ use crate::{
     test_helper::{get_raw_data, get_zklogin_inputs},
     ZkMaterial,
 };
-use sp_core::{bounded::BoundedVec, crypto::Pair as TPair, ed25519::Pair, ConstU32, U256};
+use sp_core::{bounded::BoundedVec, ConstU32};
 
 #[test]
 fn verify_zklogin() {

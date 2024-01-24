@@ -59,10 +59,12 @@ pub mod pallet {
 
     #[pallet::error]
     pub enum Error<T> {
-        /// TODO
+        /// Ephemeral key is is expired.
         EphKeyExpired,
-        /// TODO
+        /// Converted from Error `InvalidTransaction`
+        /// No need to get any detailed error here.
         InvalidTransaction,
+        /// Converted from Error `UnknownTransaction`
         UnknownTransactionCannotLookup,
         UnknownTransactionNoUnsignedValidator,
         UnknownTransactionCustom,
@@ -93,7 +95,7 @@ pub mod pallet {
             // check ephemeral key's expiration time
             let now = T::BlockNumberProvider::current_block_number();
             let expire_at: BlockNumberFor<T> = zk_material.get_ephkey_expire_at().into();
-            ensure!(expire_at <= now, Error::<T>::EphKeyExpired);
+            ensure!(expire_at >= now, Error::<T>::EphKeyExpired);
 
             // execute real call
             let r = Executive::<T>::apply_extrinsic(uxt, address_seed);
@@ -113,6 +115,8 @@ pub mod pallet {
 
         fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
             // TODO no need?
+            // validate the transaction that is submitted from external (not local)
+            // or included in transaction pool
             match source {
                 TransactionSource::InBlock | TransactionSource::External => { /* allowed */ }
                 _ => return InvalidTransaction::Call.into(),
@@ -121,10 +125,12 @@ pub mod pallet {
             // verify signature
             match call {
                 Call::submit_zklogin_unsigned { uxt, address_seed, zk_material } => {
-                    // only signed extrinsic is allowed
+                    // Only signed extrinsic is allowed
                     if !uxt.is_signed().unwrap_or(false) {
                         return InvalidTransaction::Call.into();
                     }
+
+                    // the zkLogin address that will pay for the tx fee and execute the real call
                     let address_seed = T::Lookup::lookup(address_seed.clone())?;
 
                     let encoded = uxt.encode();

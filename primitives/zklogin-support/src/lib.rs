@@ -1,3 +1,7 @@
+//! # Supportive functions of Zklogin
+//!
+//! Mainly about `zklogin_verify`
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use crate::{
@@ -44,6 +48,7 @@ pub enum ZkLoginEnv {
     /// Use the secure global verifying key derived from ceremony.
     Prod,
     /// Use the insecure global verifying key.
+    #[allow(unused)]
     Test,
 }
 

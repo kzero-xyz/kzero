@@ -10,7 +10,7 @@ use frame_support::{
 };
 use pallet_balances::Call as BalancesCall;
 use scale_codec::{Decode, Encode};
-use sp_core::{crypto::AccountId32, ed25519, Pair, H256};
+use sp_core::{ed25519, Pair, H256};
 use sp_runtime::{
     generic,
     generic::{CheckedExtrinsic, UncheckedExtrinsic},
@@ -20,7 +20,7 @@ use sp_runtime::{
 };
 use std::str::FromStr;
 use zklogin_support::{
-    test_helper::{get_raw_data, get_zklogin_inputs},
+    test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs},
     JWKProvider, JwkId, ZkMaterial,
 };
 
@@ -101,7 +101,7 @@ impl frame_system::Config for Test {
     type SystemWeightInfo = ();
     type SS58Prefix = ();
     type OnSetCode = ();
-    type MaxConsumers = frame_support::traits::ConstU32<16>;
+    type MaxConsumers = ConstU32<16>;
 }
 
 parameter_types! {
@@ -132,14 +132,6 @@ impl super::Config for Test {
     type CheckedExtrinsic = MockCheckedExtrinsic;
     type UnsignedValidator = Test;
     type BlockNumberProvider = System;
-}
-
-fn eph_key() -> ed25519::Pair {
-    let pri_key = [
-        251, 112, 167, 63, 195, 4, 26, 202, 18, 45, 182, 138, 84, 202, 34, 15, 209, 217, 76, 114,
-        180, 67, 72, 157, 104, 241, 172, 212, 122, 18, 74, 54,
-    ];
-    Pair::from_seed(&pri_key)
 }
 
 fn zk_address() -> AccountId {
@@ -173,10 +165,11 @@ fn validate_unsigned_should_work() {
     use sp_runtime::traits::ValidateUnsigned;
     let source = sp_runtime::transaction_validity::TransactionSource::External;
 
+    // get zk-related variables for zk-proof verifying
     let (address_seed, input_data, expire_at, eph_pubkey) = get_raw_data();
     let inputs = get_zklogin_inputs(input_data);
 
-    let signing_key = eph_key();
+    let signing_key = get_test_eph_key();
 
     let google_kid = "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781";
     let google_jwk_id = JwkId::new(
@@ -186,7 +179,7 @@ fn validate_unsigned_should_work() {
 
     let zk_material = ZkMaterial::new(google_jwk_id, inputs, expire_at, eph_pubkey);
 
-    // construct uxt
+    // construct Transfer Call
     let dest = AccountId::from([0u8; 32]);
     let call: RuntimeCall =
         BalancesCall::transfer_keep_alive { dest: MultiAddress::Id(dest.clone()), value: 100 }
@@ -195,6 +188,7 @@ fn validate_unsigned_should_work() {
     let payload = SignedPayload::new(call.clone(), MockExtra).expect("payload should succeed");
     let sign = payload.using_encoded(|d| signing_key.sign(d));
 
+    // construct inner unchecked_extrinsic
     let uxt = MockUncheckedExtrinsic::new_signed(
         call,
         AccountId::from(signing_key.public()).into(),
@@ -216,17 +210,22 @@ fn validate_unsigned_should_work() {
     >::new_unsigned(final_call.clone().into());
 
     new_test_ext().execute_with(|| {
-        System::set_block_number(1000);
+        // the eph key's expiration at 834, make sure current number is smaller.
+        System::set_block_number(10);
         assert!(Pallet::<Test>::validate_unsigned(source, &final_call).is_ok());
 
         // execute through call.dispatch
         assert_ok!(final_call.dispatch_bypass_filter(RawOrigin::None.into()));
+        // deduct 100 from zk_address
         assert_eq!(Balances::free_balance(&zk_address(),), 900);
+        // transfer success
         assert_eq!(Balances::free_balance(&dest), 100);
 
         // execute through `apply_extrinsic`
         assert_ok!(MockExecutive::apply_extrinsic(outer_uxt));
+        // deduct 100 from zk_address
         assert_eq!(Balances::free_balance(&zk_address(),), 800);
+        // transfer success
         assert_eq!(Balances::free_balance(&dest), 200);
     });
 }

@@ -4,6 +4,7 @@ use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use sp_core::U256;
 use sp_std::vec::Vec;
 
+/// The prepared verifying key for production env.
 pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
     // Convert the Circom G1/G2/GT to arkworks G1/G2/GT
     let vk_alpha_1 = g1_affine_from_str_projective(&[
@@ -133,6 +134,7 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
     PreparedVerifyingKey::from(vk)
 }
 
+/// The prepared verifying key for testing.
 pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
     // Convert the Circom G1/G2/GT to arkworks G1/G2/GT
     let vk_alpha_1 = g1_affine_from_str_projective(&[
