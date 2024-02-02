@@ -16,6 +16,7 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
             "7775817982019986089115946956794180159548389285968353014325286374017358010641",
         )
         .unwrap(),
+        U256::one(), // BigUint::one()
     ])
     .unwrap();
     let vk_beta_2 = g2_affine_from_str_projective(&[
@@ -39,6 +40,7 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
+        [U256::one(), U256::zero()],
     ])
     .unwrap();
     let vk_gamma_2 = g2_affine_from_str_projective(&[
@@ -62,6 +64,7 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
+        [U256::one(), U256::zero()],
     ])
     .unwrap();
     let vk_delta_2 = g2_affine_from_str_projective(&[
@@ -85,6 +88,7 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
+        [U256::one(), U256::zero()],
     ])
     .unwrap();
 
@@ -100,6 +104,7 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
                 "18066827569413962196795937356879694709963206118612267170825707780758040578649",
             )
             .unwrap(),
+            U256::one(),
         ],
         [
             U256::from_dec_str(
@@ -110,6 +115,7 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
                 "3296759704176575765409730962060698204792513807296274014163938591826372646699",
             )
             .unwrap(),
+            U256::one(),
         ],
     ] {
         let g1 = g1_affine_from_str_projective(&e).unwrap();
@@ -140,6 +146,7 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
             "7775817982019986089115946956794180159548389285968353014325286374017358010641",
         )
         .unwrap(),
+        U256::one(), // BigUint::one()
     ])
     .unwrap();
     let vk_beta_2 = g2_affine_from_str_projective(&[
@@ -163,6 +170,7 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
+        [U256::one(), U256::zero()],
     ])
     .unwrap();
     let vk_gamma_2 = g2_affine_from_str_projective(&[
@@ -186,6 +194,7 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
+        [U256::one(), U256::zero()],
     ])
     .unwrap();
     let vk_delta_2 = g2_affine_from_str_projective(&[
@@ -209,6 +218,7 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
+        [U256::one(), U256::zero()],
     ])
     .unwrap();
 
@@ -224,6 +234,7 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
                 "18066827569413962196795937356879694709963206118612267170825707780758040578649",
             )
             .unwrap(),
+            U256::one(),
         ],
         [
             U256::from_dec_str(
@@ -234,6 +245,7 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
                 "3296759704176575765409730962060698204792513807296274014163938591826372646699",
             )
             .unwrap(),
+            U256::one(),
         ],
     ] {
         let g1 = g1_affine_from_str_projective(&e).unwrap();
@@ -264,6 +276,7 @@ pub(crate) fn simple_pvk() -> PreparedVerifyingKey<Bn254> {
             "7943407426447424955968248901589949500204372753630177550538615750882537448474",
         )
         .unwrap(),
+        U256::one(),
     ])
     .unwrap();
     let vk_beta_2 = g2_affine_from_str_projective(&[
@@ -287,6 +300,7 @@ pub(crate) fn simple_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
+        [U256::one(), U256::zero()],
     ])
     .unwrap();
     let vk_gamma_2 = g2_affine_from_str_projective(&[
@@ -310,6 +324,7 @@ pub(crate) fn simple_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
+        [U256::one(), U256::zero()],
     ])
     .unwrap();
     let vk_delta_2 = g2_affine_from_str_projective(&[
@@ -333,6 +348,7 @@ pub(crate) fn simple_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
+        [U256::one(), U256::zero()],
     ])
     .unwrap();
 
@@ -348,6 +364,7 @@ pub(crate) fn simple_pvk() -> PreparedVerifyingKey<Bn254> {
                 "17693728935931939241515810642595680447035199591746806286165821038002500516550",
             )
             .unwrap(),
+            U256::one(),
         ],
         [
             U256::from_dec_str(
@@ -358,6 +375,7 @@ pub(crate) fn simple_pvk() -> PreparedVerifyingKey<Bn254> {
                 "6892338930764372209627434070805730856022340887413096721384737551282428154091",
             )
             .unwrap(),
+            U256::one(),
         ],
     ] {
         let g1 = g1_affine_from_str_projective(&e).unwrap();

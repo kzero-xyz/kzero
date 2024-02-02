@@ -1,8 +1,9 @@
 use crate::{
     jwk::{JWKProvider, JwkId},
     test_helper::{
-        build_proof_points, get_raw_data, get_raw_data_from_json, get_zklogin_inputs,
-        CircomBuilder, CircomConfig, ZkInputResult,
+        build_auth_data, get_raw_data, get_raw_data_from_json, get_zklogin_inputs,
+        get_zklogin_inputs_with_infinity, CircomBuilder, CircomConfig, ZkInputResult,
+        ZkMaterialWithInfinity,
     },
     Groth16, ZkMaterial,
 };
@@ -69,9 +70,9 @@ fn verify_zklogin_from_prove() {
     let user_sub = "111140461530246164526";
     let (address_seed, max_epoch, eph_pubkey_bytes) = get_raw_data_from_json(inputs_json, user_sub);
 
-    let proof_json = build_proof_points(&proof, inputs_json);
+    let (header, value, index_mod_4) = build_auth_data(inputs_json);
 
-    let input = get_zklogin_inputs(proof_json);
+    let input = get_zklogin_inputs_with_infinity(proof, header, value, index_mod_4);
 
     let google_kid = "85e55107466b7e29836199c58c7581f5b923be44";
     let google_jwk_id = JwkId::new(
@@ -79,9 +80,10 @@ fn verify_zklogin_from_prove() {
         BoundedVec::<u8, ConstU32<256>>::truncate_from(google_kid.as_bytes().to_vec()),
     );
 
-    let zk_material = ZkMaterial::new(google_jwk_id, input, max_epoch, eph_pubkey_bytes);
+    let zk_material =
+        ZkMaterialWithInfinity::new(google_jwk_id, input, max_epoch, eph_pubkey_bytes);
 
-    let zklogin_result = zk_material.verify_zk_login_in_test(&address_seed);
+    let zklogin_result = zk_material.verify_zk_login_in_simple_test(&address_seed);
 
     assert!(zklogin_result.is_ok());
 }

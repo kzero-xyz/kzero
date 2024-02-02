@@ -1,39 +1,71 @@
+#[allow(unused)]
 use crate::{
-    error::{ZkAuthError, ZkAuthResult},
+    error::{FrParseError, ZkAuthError, ZkAuthResult},
+    jwk::get_modulo,
     poseidon::poseidon_zk_login,
+    pvk::{prod_pvk, simple_pvk, test_pvk},
+    utils::split_to_two_frs,
     zk_input::{Bn254Fr, Claim, ZkLoginInputs, ZkLoginProof},
-    PACK_WIDTH,
+    JwkId, PubKey, ZkLoginEnv, PACK_WIDTH,
 };
 use ark_bn254::Bn254;
+#[allow(unused)]
+use ark_bn254::Fr;
 #[cfg(test)]
 use ark_circom::circom::{R1CSFile, R1CS};
 #[cfg(test)]
 use ark_circom::{CircomCircuit, WitnessCalculator};
+use ark_crypto_primitives::snark::SNARK;
 #[cfg(test)]
 use ark_ec::pairing::Pairing;
-use ark_ff::{ToConstraintField, Zero};
-use ark_groth16::Proof;
+#[allow(unused)]
+use ark_ff::{PrimeField, ToConstraintField, Zero};
+use ark_groth16::{Groth16, Proof};
+#[allow(unused)]
+use base64ct::{Base64UrlUnpadded, Encoding};
 #[cfg(test)]
 use color_eyre::Result;
+#[allow(unused)]
 use num_bigint::{BigInt, BigUint};
 use serde::{de::Error, Deserialize, Serialize};
-use serde_json::{self, json};
-use sp_core::{crypto::AccountId32, ed25519::Pair as Ed25519Pair, Pair, U256};
+use serde_json::{self};
+#[allow(unused)]
+use sp_core::{crypto::AccountId32, ed25519::Pair as Ed25519Pair, Pair, RuntimeDebug, U256};
+#[allow(unused)]
 use std::{collections::HashMap, str::FromStr};
 #[cfg(test)]
 use std::{fs::File, path::Path};
-
 const MAX_KEY_CLAIM_NAME_LENGTH: u8 = 32;
 const MAX_KEY_CLAIM_VALUE_LENGTH: u8 = 115;
 const MAX_AUD_VALUE_LENGTH: u8 = 145;
 
-type CircomG1Json = [String; 2];
-type CircomG2Json = [[String; 2]; 2];
+type CircomG1Json = [String; 3];
+type CircomG2Json = [[String; 2]; 3];
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CircomG1JsonWithInfinity {
+    elements: [String; 2],
+    infinity: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CircomG2JsonWithInfinity {
+    elements: [[String; 2]; 2],
+    infinity: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZkLoginProofJson {
     pub(crate) a: CircomG1Json,
     pub(crate) b: CircomG2Json,
     pub(crate) c: CircomG1Json,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZkLoginProofJsonWithInfinity {
+    pub(self) a: CircomG1JsonWithInfinity,
+    pub(self) b: CircomG2JsonWithInfinity,
+    pub(self) c: CircomG1JsonWithInfinity,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +79,20 @@ pub struct ZkLoginInputsReaderJson {
     pub(crate) proof_points: ZkLoginProofJson,
     pub(crate) iss_base64_details: ClaimJson,
     pub(crate) header: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZkLoginInputsReaderJsonWithInifinity {
+    pub(crate) proof_points: ZkLoginProofJsonWithInfinity,
+    pub(crate) iss_base64_details: ClaimJson,
+    pub(crate) header: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZkLoginInputsReaderWithInifinity {
+    pub(crate) proof_points: ZkLoginProof,
+    pub(crate) iss_base64_details: Claim,
+    pub(crate) header: U256,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,12 +112,13 @@ impl From<ZkLoginProofJson> for ZkLoginProof {
     fn from(value: ZkLoginProofJson) -> Self {
         let convert = |s: &str| U256::from_dec_str(s).expect("");
 
-        let a = [convert(&value.a[0]), convert(&value.a[1])];
+        let a = [convert(&value.a[0]), convert(&value.a[1]), convert(&value.a[2])];
         let b = [
             [convert(&value.b[0][0]), convert(&value.b[0][1])],
             [convert(&value.b[1][0]), convert(&value.b[1][1])],
+            [convert(&value.b[2][0]), convert(&value.b[2][1])],
         ];
-        let c = [convert(&value.c[0]), convert(&value.c[1])];
+        let c = [convert(&value.c[0]), convert(&value.c[1]), convert(&value.c[2])];
         Self { a, b, c }
     }
 }
@@ -548,17 +595,9 @@ pub fn get_raw_data_from_json(inputs: &str, user_sub: &str) -> (AccountId32, u32
     return (address_seed, max_epoch, eph_pubkey_bytes);
 }
 
-pub fn build_proof_points(proof: &Proof<Bn254>, inputs: &str) -> String {
+pub fn build_auth_data(inputs: &str) -> (U256, U256, u8) {
     let whole_inputs_json: &serde_json::Value = &serde_json::from_str(inputs).unwrap();
     let input_json: &serde_json::Value = whole_inputs_json.get(AUTHFIELDS).unwrap();
-
-    let proof_json = convert_proof_to_json(&proof);
-
-    let proof_points_json = json!({
-        "a": proof_json.a,
-        "b": proof_json.b,
-        "c": proof_json.c,
-    });
 
     let header = convert_to_u256(
         hash_ascii_str_to_field(
@@ -567,9 +606,7 @@ pub fn build_proof_points(proof: &Proof<Bn254>, inputs: &str) -> String {
         )
         .unwrap()
         .into(),
-    )
-    .to_string();
-
+    );
     let iss_base64_details = input_json.get(ISS_BASE64_DETAILS).unwrap();
     let value = convert_to_u256(
         hash_ascii_str_to_field(
@@ -578,23 +615,11 @@ pub fn build_proof_points(proof: &Proof<Bn254>, inputs: &str) -> String {
         )
         .unwrap()
         .into(),
-    )
-    .to_string();
+    );
     let index_mod_4 =
         iss_base64_details.get(INDEX_MOD4).and_then(|v| v.as_u64()).unwrap_or_default();
 
-    let iss_base64_details = json!({
-        "value": value,
-        "index_mod_4": index_mod_4,
-    });
-
-    let proof_data = json!({
-        "proof_points": proof_points_json,
-        "iss_base64_details": iss_base64_details,
-        "header": header,
-    });
-
-    serde_json::to_string(&proof_data).expect("Failed to convert Value to JSON string")
+    return (header, value, index_mod_4 as u8);
 }
 
 pub fn get_raw_data() -> (AccountId32, String, u32, [u8; 32]) {
@@ -616,7 +641,8 @@ pub fn get_raw_data() -> (AccountId32, String, u32, [u8; 32]) {
         "proof_points": {
             "a": [
             "9381813773171450462648323179981700992482234003937252912184366692176647122440",
-            "17135816274588842394987740577348746744124536487185243735653495512098467176682"
+            "17135816274588842394987740577348746744124536487185243735653495512098467176682",
+            "1"
             ],
             "b": [
             [
@@ -626,11 +652,16 @@ pub fn get_raw_data() -> (AccountId32, String, u32, [u8; 32]) {
             [
             "2739509173985286250590833064309803350595900462807230565709419062550672100574",
             "9617502836905847049711738720668642526073457745474007398904997426591688823762"
+            ],
+            [
+            "1",
+            "0"
             ]
             ],
             "c": [
             "4236607764644869062435426868625747082828648484430168905284460458292661376562",
-            "13765193476064868657640379803797505779241026862161166609423648103540137745710"
+            "13765193476064868657640379803797505779241026862161166609423648103540137745710",
+            "1"
             ]
         },
         "iss_base64_details": {
@@ -651,6 +682,20 @@ pub fn get_zklogin_inputs(proof_data: String) -> ZkLoginInputs {
     input
 }
 
+#[cfg(test)]
+pub fn get_zklogin_inputs_with_infinity(
+    proof: Proof<Bn254>,
+    header: U256,
+    value: U256,
+    index_mod_4: u8,
+) -> ZkLoginInputsWithInfinity {
+    return ZkLoginInputsWithInfinity {
+        proof_points: proof,
+        iss_base64_details: Claim { value, index_mod_4 },
+        header,
+    };
+}
+
 fn convert_to_u256<const N: usize>(big_int: ark_ff::BigInt<N>) -> U256 {
     let mut u256 = [0u64; 4];
     // Assuming N <= 4, copy elements from BigInt to U256
@@ -660,18 +705,165 @@ fn convert_to_u256<const N: usize>(big_int: ark_ff::BigInt<N>) -> U256 {
     U256(u256)
 }
 
-pub fn convert_proof_to_json(proof: &Proof<Bn254>) -> ZkLoginProofJson {
-    let a0 = convert_to_u256(proof.a.to_field_elements().unwrap()[0].into()).to_string();
-    let a1 = convert_to_u256(proof.a.to_field_elements().unwrap()[1].into()).to_string();
+// pub fn convert_proof_to_json(proof: &Proof<Bn254>) -> ZkLoginProofJsonWithInfinity {
+//     let a0 = convert_to_u256(proof.a.to_field_elements().unwrap()[0].into()).to_string();
+//     let a1 = convert_to_u256(proof.a.to_field_elements().unwrap()[1].into()).to_string();
+//     let a2 = convert_to_u256(proof.a.to_field_elements().unwrap()[2].into()).to_string(); // this is the infinity
 
-    let b0 = convert_to_u256(proof.b.to_field_elements().unwrap()[0].into()).to_string();
-    let b1 = convert_to_u256(proof.b.to_field_elements().unwrap()[1].into()).to_string();
-    let b2 = convert_to_u256(proof.b.to_field_elements().unwrap()[2].into()).to_string();
-    let b3 = convert_to_u256(proof.b.to_field_elements().unwrap()[3].into()).to_string();
+//     println!("proofb is {:?}", proof.b.to_field_elements().unwrap());
+//     let b0 = convert_to_u256(proof.b.to_field_elements().unwrap()[0].into()).to_string();
+//     let b1 = convert_to_u256(proof.b.to_field_elements().unwrap()[1].into()).to_string();
+//     let b2 = convert_to_u256(proof.b.to_field_elements().unwrap()[2].into()).to_string();
+//     let b3 = convert_to_u256(proof.b.to_field_elements().unwrap()[3].into()).to_string();
+//     let b4 = convert_to_u256(proof.b.to_field_elements().unwrap()[4].into()).to_string(); // this is the infinity
 
-    let c0 = convert_to_u256(proof.c.to_field_elements().unwrap()[0].into()).to_string();
-    let c1 = convert_to_u256(proof.c.to_field_elements().unwrap()[1].into()).to_string();
+//     let c0 = convert_to_u256(proof.c.to_field_elements().unwrap()[0].into()).to_string();
+//     let c1 = convert_to_u256(proof.c.to_field_elements().unwrap()[1].into()).to_string();
+//     let c2 = convert_to_u256(proof.c.to_field_elements().unwrap()[2].into()).to_string(); // this is the infinity
 
-    let proof_json = ZkLoginProofJson { a: [a0, a1], b: [[b0, b1], [b2, b3]], c: [c0, c1] };
-    return proof_json;
+//     let proof_json = ZkLoginProofJsonWithInfinity {
+//         a: CircomG1JsonWithInfinity { elements: [a0, a1], infinity: a2 },
+//         b: CircomG2JsonWithInfinity { elements: [[b0, b1], [b2, b3]], infinity: b4 },
+//         c: CircomG1JsonWithInfinity { elements: [c0, c1], infinity: c2 },
+//     };
+//     return proof_json;
+// }
+
+#[cfg(test)]
+#[derive(Clone, RuntimeDebug, PartialEq)]
+pub struct ZkLoginInputsWithInfinity {
+    pub(crate) proof_points: Proof<Bn254>,
+    pub(crate) iss_base64_details: Claim,
+    pub(crate) header: U256,
+}
+
+#[cfg(test)]
+impl ZkLoginInputsWithInfinity {
+    /// Get the zk login proof.
+    pub fn get_proof(&self) -> &Proof<Bn254> {
+        &self.proof_points
+    }
+
+    /// Calculate the poseidon hash from selected fields from inputs, along with the ephemeral pubkey.
+    pub fn calculate_all_inputs_hash(
+        &self,
+        address_seed: U256,
+        // TODO; change this to [u8; 32]
+        eph_pk_bytes: &PubKey,
+        modulus: &[u8],
+        max_epoch: u32,
+    ) -> Result<Bn254Fr, ZkAuthError> {
+        let (first, second) = split_to_two_frs(eph_pk_bytes)?;
+        let address_seed = Fr::from_bigint(ark_ff::BigInt(address_seed.0))
+            .ok_or(FrParseError::AddressSeedParseError)?;
+        let max_epoch_f = BigUint::from(max_epoch).into();
+        let index_mod_4_f = BigUint::from(self.iss_base64_details.index_mod_4).into();
+        let iss_base64_f = Fr::from_bigint(ark_ff::BigInt(self.iss_base64_details.value.0))
+            .ok_or(FrParseError::IsBase64DetailsParseError)?;
+        let header_f: Fr = Fr::from_bigint(ark_ff::BigInt(self.header.0)).unwrap();
+
+        let modulus_f = hash_to_field(&[BigUint::from_bytes_be(modulus)], 2048, PACK_WIDTH)
+            .map_err(|_| FrParseError::ModuloParseError)?;
+        poseidon_zk_login(vec![
+            first,
+            second,
+            address_seed,
+            max_epoch_f,
+            iss_base64_f,
+            index_mod_4_f,
+            header_f,
+            modulus_f,
+        ])
+    }
+}
+
+#[cfg(test)]
+/// The material that is used for zkproof verification
+#[derive(RuntimeDebug, Clone, PartialEq)]
+pub struct ZkMaterialWithInfinity {
+    /// (JwtProvider,kid) that is used to get the corresponding `n`, which
+    /// will be used in zk proof verification
+    source: JwkId,
+    /// ZkProof
+    inputs: ZkLoginInputsWithInfinity,
+    /// When the ephemeral key is expired
+    ephkey_expire_at: u32,
+    /// The ephemeral public key, for more specific, the ephemeral key
+    /// is used to sign the extrinsic
+    eph_pubkey: PubKey,
+}
+
+#[cfg(test)]
+impl ZkMaterialWithInfinity {
+    pub fn new(
+        source: JwkId,
+        inputs: ZkLoginInputsWithInfinity,
+        ephkey_expire_at: u32,
+        eph_pubkey: [u8; 32],
+    ) -> Self {
+        Self { source, inputs, ephkey_expire_at, eph_pubkey }
+    }
+
+    pub fn get_eph_pubkey(&self) -> PubKey {
+        return self.eph_pubkey;
+    }
+
+    pub fn get_ephkey_expire_at(&self) -> u32 {
+        return self.ephkey_expire_at;
+    }
+
+    /// entry to handle zklogin-support proof verification
+    pub fn verify_zk_login_in_simple_test(&self, address_seed: &AccountId32) -> ZkAuthResult<()> {
+        // Load the expected JWK.
+        // now supports Google, Twitch, Facebook, Apple, Slack,
+        let jwk = get_modulo(&self.source)?;
+
+        // Decode modulus to bytes.
+        let modulus =
+            Base64UrlUnpadded::decode_vec(&jwk.n).map_err(|_| ZkAuthError::ModulusDecodeError)?;
+
+        let address_seed_u256 = U256::from_big_endian(address_seed.as_ref());
+
+        // Calculate all inputs hash and passed to the verification function.
+        match verify_zklogin_proof_in_simple_test(
+            self.inputs.get_proof(),
+            &[self.inputs.calculate_all_inputs_hash(
+                address_seed_u256,
+                &self.eph_pubkey,
+                &modulus,
+                self.ephkey_expire_at,
+            )?],
+        ) {
+            Ok(true) => Ok(()),
+            Ok(false) | Err(_) => Err(ZkAuthError::ProofVerifyingFailed),
+        }
+    }
+}
+
+#[allow(unused)]
+/// Verify zklogin-support proof with pvk in production
+fn verify_zklogin_proof_in_simple_test(
+    proof: &Proof<Bn254>,
+    public_inputs: &[Bn254Fr],
+) -> Result<bool, ZkAuthError> {
+    verify_zklogin_proof_with_fixed_vk(&ZkLoginEnv::Simple, proof, public_inputs)
+}
+
+#[allow(unused)]
+/// Verify a proof against its public inputs using the fixed verifying key.
+fn verify_zklogin_proof_with_fixed_vk(
+    usage: &ZkLoginEnv,
+    proof: &Proof<Bn254>,
+    public_inputs: &[Bn254Fr],
+) -> Result<bool, ZkAuthError> {
+    let prod_pvk = prod_pvk();
+    let test_pvk = test_pvk();
+    let simple_pvk = simple_pvk();
+    let vk = match usage {
+        ZkLoginEnv::Prod => &prod_pvk,
+        ZkLoginEnv::Test => &test_pvk,
+        ZkLoginEnv::Simple => &simple_pvk,
+    };
+    Groth16::<Bn254>::verify_with_processed_vk(vk, public_inputs, proof)
+        .map_err(|e| ZkAuthError::GeneralError(e.into()))
 }
