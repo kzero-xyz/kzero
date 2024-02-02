@@ -68,3 +68,9 @@ serde = [
     "sp-core/serde",
     "sp-runtime/serde",
 ]
+
+[dev-dependencies]
+ark-ec = { version = "0.4.1", default-features = false }
+ark-circom = { git = "https://github.com/jonathanxuu/circom-compat.git", branch = "test"}
+color-eyre = { version = "=0.6.2", default-features = false }
+rand_chacha = "0.3"

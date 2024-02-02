@@ -13,6 +13,7 @@ use ark_bn254::Bn254;
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::{Groth16, Proof};
 use base64ct::{Base64UrlUnpadded, Encoding};
+use pvk::simple_pvk;
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{crypto::AccountId32, U256};
@@ -50,6 +51,9 @@ pub enum ZkLoginEnv {
     /// Use the insecure global verifying key.
     #[allow(unused)]
     Test,
+    /// Use the insecure global verifying key for testOnly.
+    #[allow(unused)]
+    Simple,
 }
 
 impl Default for ZkLoginEnv {
@@ -93,7 +97,7 @@ where
         }
 
         // verify zk proof
-        self.zk_material.verify_zk_login(signer).is_ok()
+        self.zk_material.verify_zk_login_in_prod(signer).is_ok()
     }
 }
 
@@ -129,8 +133,9 @@ impl ZkMaterial {
     pub fn get_ephkey_expire_at(&self) -> u32 {
         return self.ephkey_expire_at;
     }
+
     /// entry to handle zklogin-support proof verification
-    pub fn verify_zk_login(&self, address_seed: &AccountId32) -> ZkAuthResult<()> {
+    pub fn verify_zk_login_in_prod(&self, address_seed: &AccountId32) -> ZkAuthResult<()> {
         // Load the expected JWK.
         // now supports Google, Twitch, Facebook, Apple, Slack,
         let jwk = get_modulo(&self.source)?;
@@ -155,6 +160,33 @@ impl ZkMaterial {
             Ok(false) | Err(_) => Err(ZkAuthError::ProofVerifyingFailed),
         }
     }
+
+    /// entry to handle zklogin-support proof verification
+    pub fn verify_zk_login_in_test(&self, address_seed: &AccountId32) -> ZkAuthResult<()> {
+        // Load the expected JWK.
+        // now supports Google, Twitch, Facebook, Apple, Slack,
+        let jwk = get_modulo(&self.source)?;
+
+        // Decode modulus to bytes.
+        let modulus =
+            Base64UrlUnpadded::decode_vec(&jwk.n).map_err(|_| ZkAuthError::ModulusDecodeError)?;
+
+        let address_seed_u256 = U256::from_big_endian(address_seed.as_ref());
+
+        // Calculate all inputs hash and passed to the verification function.
+        match verify_zklogin_proof_in_simple_test(
+            &self.inputs.get_proof().as_arkworks()?,
+            &[self.inputs.calculate_all_inputs_hash(
+                address_seed_u256,
+                &self.eph_pubkey,
+                &modulus,
+                self.ephkey_expire_at,
+            )?],
+        ) {
+            Ok(true) => Ok(()),
+            Ok(false) | Err(_) => Err(ZkAuthError::ProofVerifyingFailed),
+        }
+    }
 }
 
 /// Verify zklogin-support proof with pvk in production
@@ -165,6 +197,14 @@ fn verify_zklogin_proof_in_prod(
     verify_zklogin_proof_with_fixed_vk(&ZkLoginEnv::Prod, proof, public_inputs)
 }
 
+/// Verify zklogin-support proof with pvk in production
+fn verify_zklogin_proof_in_simple_test(
+    proof: &Proof<Bn254>,
+    public_inputs: &[Bn254Fr],
+) -> Result<bool, ZkAuthError> {
+    verify_zklogin_proof_with_fixed_vk(&ZkLoginEnv::Simple, proof, public_inputs)
+}
+
 /// Verify a proof against its public inputs using the fixed verifying key.
 fn verify_zklogin_proof_with_fixed_vk(
     usage: &ZkLoginEnv,
@@ -173,9 +213,11 @@ fn verify_zklogin_proof_with_fixed_vk(
 ) -> Result<bool, ZkAuthError> {
     let prod_pvk = prod_pvk();
     let test_pvk = test_pvk();
+    let simple_pvk = simple_pvk();
     let vk = match usage {
         ZkLoginEnv::Prod => &prod_pvk,
         ZkLoginEnv::Test => &test_pvk,
+        ZkLoginEnv::Simple => &simple_pvk,
     };
     Groth16::<Bn254>::verify_with_processed_vk(vk, public_inputs, proof)
         .map_err(|e| ZkAuthError::GeneralError(e.into()))

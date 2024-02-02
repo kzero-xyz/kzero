@@ -153,7 +153,7 @@ pub mod pallet {
 
                     // validate zk proof
                     zk_material
-                        .verify_zk_login(&address_seed)
+                        .verify_zk_login_in_prod(&address_seed)
                         .map_err(|_| InvalidTransaction::BadProof)?;
 
                     xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)

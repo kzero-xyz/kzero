@@ -3,7 +3,7 @@ use sp_core::ConstU32;
 use sp_runtime::BoundedVec;
 use sp_std::result::Result;
 
-const GOOGLE_JWK_LIST: [JWK; 2] = [
+const GOOGLE_JWK_LIST: [JWK; 4] = [
     JWK {
         kty: "RSA",
         e: "AQAB",
@@ -15,6 +15,20 @@ const GOOGLE_JWK_LIST: [JWK; 2] = [
         kty: "RSA",
         n: "qwrzl06fwB6OIm62IxNG7NXNIDmgdBrvf09ob2Gsp6ZmAXgU4trHPUYrdBaAlU5aHpchXCf_mVL-U5dzRqeVFQsVqsj4PEIE6E5OPw8EwumP2fzLQSswpkKmJJKFcdncfQ730QBonRUEhKkIbiYdicJl5yTkORd0_BmfdLV98r-sEwEHN4lzTJ15-yw90ob_R6vAH4wPyCSN3Xe5_zV6R4ENL2NlKn2HT9lbV7HhtQongea8wfnthUhdZH38kI4SS5nAaCVNxEAzlvJtUIdCpSgjUgcbah-DwY39l4D800kLxkcF2CGXPSmpF8GPs1aWSsYupY8sTSy9qCFJFPFx8Q",
         kid: "48a63bc4767f8550a532dc630cf7eb49ff397e7c",
+        e: "AQAB",
+        alg: "RS256"
+    },
+    JWK {
+        kty: "RSA",
+        n: "4tVDrq5RbeDtlJ2Xh2dikE840LWflr89Cm3cGI9mQGlskTigV0anoViOH92Z1sqWAp5e1aRkLlCm-KAWc69uvOW_X70jEhzDJVREeB3h-RAnzxYrbUgDEgltiUaM8Zxtt8hiVh_GDAudRmSP9kDxXL5xnJETF1gnwAHa0j7cM4STLKbtwKi73CEmTjTLqGAES8XVnXp8VWGb6IuQzdmBIJkfcFog4Inq93F4Cj_SXsSjECG3j56VxgwnloPCHTXVn_xS1s3OjoBCOvOVSJfg2nSTWNi93JGR9pWZevh7Sq8Clw8H2lvIAPV_HYdxvsucWg8sJuTa6ZZSxT1WmBkW6Q",
+        kid: "85e55107466b7e29836199c58c7581f5b923be44",
+        e: "AQAB",
+        alg: "RS256"
+    },
+    JWK {
+        kty: "RSA",
+        n: "v3dZL2R2PuebbAChYXKVW6R-FJDUVmZ8TyVMWH0-VpVjFYZvy7BZaE5ApLWc3UhpXug6r6230AJI0ow5yePnqmZnI5qckxz0br0Fj27Zdg-X4PWN95gdk6fpI4JwNmZFsgiWzmDiP118j8jIxMNBiIVPT7RyykhAZeNnGC2kDU-81iop850K205EwfSi_TBT6HCbRj_TSQ2oJfIXDPX8s7Kg4PRjDOHt3D8CiqsIWbxSkRRuTiU_1Ahsbuc3d9hkD1rOOThVT6T7LVZT710WtPa1QbKUgGIu2pmiPo0BCdnbqozsRVOwY901R77VlVwpTuGonPZuyO1B2FgGuYgotw",
+        kid: "bdc4e109815f469460e63d34cd684215148d7b59",
         e: "AQAB",
         alg: "RS256"
     }

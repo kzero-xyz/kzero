@@ -16,7 +16,6 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
             "7775817982019986089115946956794180159548389285968353014325286374017358010641",
         )
         .unwrap(),
-        U256::one(), // BigUint::one()
     ])
     .unwrap();
     let vk_beta_2 = g2_affine_from_str_projective(&[
@@ -40,7 +39,6 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
-        [U256::one(), U256::zero()],
     ])
     .unwrap();
     let vk_gamma_2 = g2_affine_from_str_projective(&[
@@ -64,7 +62,6 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
-        [U256::one(), U256::zero()],
     ])
     .unwrap();
     let vk_delta_2 = g2_affine_from_str_projective(&[
@@ -88,7 +85,6 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
-        [U256::one(), U256::zero()],
     ])
     .unwrap();
 
@@ -104,7 +100,6 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
                 "18066827569413962196795937356879694709963206118612267170825707780758040578649",
             )
             .unwrap(),
-            U256::one(),
         ],
         [
             U256::from_dec_str(
@@ -115,7 +110,6 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
                 "3296759704176575765409730962060698204792513807296274014163938591826372646699",
             )
             .unwrap(),
-            U256::one(),
         ],
     ] {
         let g1 = g1_affine_from_str_projective(&e).unwrap();
@@ -146,7 +140,6 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
             "7775817982019986089115946956794180159548389285968353014325286374017358010641",
         )
         .unwrap(),
-        U256::one(),
     ])
     .unwrap();
     let vk_beta_2 = g2_affine_from_str_projective(&[
@@ -170,7 +163,6 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
-        [U256::one(), U256::zero()],
     ])
     .unwrap();
     let vk_gamma_2 = g2_affine_from_str_projective(&[
@@ -194,7 +186,6 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
-        [U256::one(), U256::zero()],
     ])
     .unwrap();
     let vk_delta_2 = g2_affine_from_str_projective(&[
@@ -218,7 +209,6 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
             )
             .unwrap(),
         ],
-        [U256::one(), U256::zero()],
     ])
     .unwrap();
 
@@ -234,7 +224,6 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
                 "18066827569413962196795937356879694709963206118612267170825707780758040578649",
             )
             .unwrap(),
-            U256::from_dec_str("1").unwrap(),
         ],
         [
             U256::from_dec_str(
@@ -245,7 +234,130 @@ pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
                 "3296759704176575765409730962060698204792513807296274014163938591826372646699",
             )
             .unwrap(),
-            U256::from_dec_str("1").unwrap(),
+        ],
+    ] {
+        let g1 = g1_affine_from_str_projective(&e).unwrap();
+        vk_gamma_abc_g1.push(g1);
+    }
+
+    let vk = VerifyingKey {
+        alpha_g1: vk_alpha_1,
+        beta_g2: vk_beta_2,
+        gamma_g2: vk_gamma_2,
+        delta_g2: vk_delta_2,
+        gamma_abc_g1: vk_gamma_abc_g1,
+    };
+
+    // Convert the verifying key into the prepared form.
+    PreparedVerifyingKey::from(vk)
+}
+
+/// The prepared verifying key for testing.
+pub(crate) fn simple_pvk() -> PreparedVerifyingKey<Bn254> {
+    // Convert the Circom G1/G2/GT to arkworks G1/G2/GT
+    let vk_alpha_1 = g1_affine_from_str_projective(&[
+        U256::from_dec_str(
+            "13598470900509834098265684769589406128910426180929737561331420823471965923459",
+        )
+        .unwrap(),
+        U256::from_dec_str(
+            "7943407426447424955968248901589949500204372753630177550538615750882537448474",
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let vk_beta_2 = g2_affine_from_str_projective(&[
+        [
+            U256::from_dec_str(
+                "15650653029752636851608774044419179510357011429404976500459621901126041339384",
+            )
+            .unwrap(),
+            U256::from_dec_str(
+                "17537683190784934545177264795728856693660187392167259532614438002445682237518",
+            )
+            .unwrap(),
+        ],
+        [
+            U256::from_dec_str(
+                "18883615256270008256178145480674187899729962278973387624315042438062036111721",
+            )
+            .unwrap(),
+            U256::from_dec_str(
+                "15758658249511029953643769301067364570437314564479993880897739568605910136438",
+            )
+            .unwrap(),
+        ],
+    ])
+    .unwrap();
+    let vk_gamma_2 = g2_affine_from_str_projective(&[
+        [
+            U256::from_dec_str(
+                "13543889478208391559735548987306221754136900678493901503913718551014581690898",
+            )
+            .unwrap(),
+            U256::from_dec_str(
+                "1185000194963695912043115947492452817927430213776646579033645662935170036295",
+            )
+            .unwrap(),
+        ],
+        [
+            U256::from_dec_str(
+                "20310006278833027670469623506974711022913915838193495494604135584952721620451",
+            )
+            .unwrap(),
+            U256::from_dec_str(
+                "5964194763569244948734533704167130348719499103210862911457308307326982719793",
+            )
+            .unwrap(),
+        ],
+    ])
+    .unwrap();
+    let vk_delta_2 = g2_affine_from_str_projective(&[
+        [
+            U256::from_dec_str(
+                "10018388658711213117607990602751825105345409457413860359513413416408852744519",
+            )
+            .unwrap(),
+            U256::from_dec_str(
+                "5979388175750753704106364849546239801343342885927161639813488284849613937543",
+            )
+            .unwrap(),
+        ],
+        [
+            U256::from_dec_str(
+                "16223129994667184676261108415936791585790287193646084201556422431098751290364",
+            )
+            .unwrap(),
+            U256::from_dec_str(
+                "4396597916238147005935857920315725114386339664358192767706481393708990686200",
+            )
+            .unwrap(),
+        ],
+    ])
+    .unwrap();
+
+    // Create a vector of G1Affine elements from the IC
+    let mut vk_gamma_abc_g1 = Vec::new();
+    for e in [
+        [
+            U256::from_dec_str(
+                "14481431358781407780227287327383355858210296706538198979159632090133620810535",
+            )
+            .unwrap(),
+            U256::from_dec_str(
+                "17693728935931939241515810642595680447035199591746806286165821038002500516550",
+            )
+            .unwrap(),
+        ],
+        [
+            U256::from_dec_str(
+                "8121595629122471341111238929545065554659233128703484700906418774454972148446",
+            )
+            .unwrap(),
+            U256::from_dec_str(
+                "6892338930764372209627434070805730856022340887413096721384737551282428154091",
+            )
+            .unwrap(),
         ],
     ] {
         let g1 = g1_affine_from_str_projective(&e).unwrap();
