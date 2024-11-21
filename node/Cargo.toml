@@ -59,7 +59,7 @@ node-template-runtime = { workspace = true, features = ["default"] }
 try-runtime-cli = { workspace = true, optional = true }
 
 # zklogin-support
-zklogin-support = { path = "../primitives/zklogin-support", features = ["default"] }
+zklogin-support = { path = "../primitives/zklogin-support", features = ["default"], optional = true }
 
 hex = "0.4.3"
 
@@ -76,6 +76,7 @@ runtime-benchmarks = [
     "frame-benchmarking/runtime-benchmarks",
     "frame-system/runtime-benchmarks",
     "node-template-runtime/runtime-benchmarks",
+    "zklogin-support"
 ]
 # Enable features that allow the zksig to be tried and debugged. Name might be subject to change
 # in the near future.

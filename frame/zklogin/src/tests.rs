@@ -169,9 +169,9 @@ fn validate_unsigned_should_work() {
     let (address_seed, input_data, expire_at, eph_pubkey) = get_raw_data();
     let inputs = get_zklogin_inputs(input_data);
 
-    let signing_key = get_test_eph_key();
+    let signing_key: ed25519::Pair = get_test_eph_key();
 
-    let google_kid = "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781";
+    let google_kid = "5aaff47c21d06e266cce395b2145c7c6d4730ea5";
     let google_jwk_id = JwkId::new(
         JWKProvider::Google,
         BoundedVec::<u8, ConstU32<256>>::truncate_from(google_kid.as_bytes().to_vec()),

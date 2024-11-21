@@ -5,6 +5,7 @@ members = [
     "runtime",
     "frame/zklogin",
     "primitives/zklogin-runtime",
+    "tests/tool",
 ]
 resolver = "2"
 
@@ -132,3 +133,5 @@ try-runtime-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch =
 node-template = { path = "./node" }
 node-template-runtime = { path = "./runtime", default-features = false }
 pallet-zklogin = { path = "./frame/zklogin", default-features = false }
+zklogin-support = { path = "./primitives/zklogin-support", default-features = false }
+zklogin-runtime = { path = "./primitives/zklogin-runtime", default-features = false }

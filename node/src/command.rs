@@ -1,10 +1,11 @@
+#[cfg(feature = "runtime-benchmarks")]
+use crate::zklogin_benchmarking::{
+    inherent_benchmark_data, ZkLoginRemarkBuilder, ZkTransferKeepAliveBuilder,
+};
 use crate::{
     chain_spec,
     cli::{Cli, Subcommand},
     service,
-    zklogin_benchmarking::{
-        inherent_benchmark_data, ZkLoginRemarkBuilder, ZkTransferKeepAliveBuilder,
-    },
 };
 use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
 use node_template_runtime::{AccountId, Block};
@@ -103,6 +104,7 @@ pub fn run() -> sc_cli::Result<()> {
                 Ok((cmd.run(client, backend, Some(aux_revert)), task_manager))
             })
         }
+        #[cfg(feature = "runtime-benchmarks")]
         Some(Subcommand::Benchmark(cmd)) => {
             let runner = cli.create_runner(cmd)?;
 
