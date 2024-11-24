@@ -189,7 +189,7 @@ where
         // For we has checked the `dispatch_info.class` in `validate_unsigned`, so the check at here is not
         // necessary. We keep this to be same implementation in `Executive`.
         if r.is_err() && dispatch_info.class == DispatchClass::Mandatory {
-            return Err(Error::<T>::InvalidTransaction.into())
+            return Err(Error::<T>::InvalidTransaction.into());
         }
 
         r

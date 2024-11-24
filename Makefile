@@ -22,7 +22,7 @@ fmt-check:
 	cargo fmt --all -- --check
 fmt:
 	taplo fmt
-	cargo fmt --all
+	cargo +nightly fmt --all
 
 .PHONY: clippy clippy-release
 clippy:

@@ -118,7 +118,7 @@ pub fn run() -> sc_cli::Result<()> {
                                 "Runtime benchmarking wasn't enabled when building the node. \
 							You can enable it with `--features zksig-benchmarks`."
                                     .into(),
-                            )
+                            );
                         }
 
                         cmd.run::<Block, ()>(config)
