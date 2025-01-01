@@ -8,17 +8,13 @@ use node_template_runtime as runtime;
 use runtime::{AccountId, Balance, BalancesCall, SystemCall};
 use sc_cli::Result;
 use sc_client_api::BlockBackend;
-use sp_core::{ConstU32, Encode, Pair};
+use sp_core::{Encode, Pair};
 use sp_inherents::{InherentData, InherentDataProvider};
-use sp_runtime::{MultiAddress, OpaqueExtrinsic};
+use sp_runtime::OpaqueExtrinsic;
 
-use sp_core::bounded_vec::BoundedVec;
 use sp_runtime::generic::Era;
 use std::{sync::Arc, time::Duration};
-use zklogin_support::{
-    test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs},
-    JWKProvider, JwkId, Signature as InnerZkSignature,
-};
+use zklogin_support::test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs};
 
 /// Generates extrinsics for the `benchmark overhead` command.
 ///
@@ -136,36 +132,12 @@ pub fn create_zklogin_benchmark_extrinsic(
         ),
     );
 
-    let signature = raw_payload.using_encoded(|e| eph_signer.sign(e));
+    let _signature = raw_payload.using_encoded(|e| eph_signer.sign(e));
 
-    let eph_pubkey = eph_signer.public();
-    let (address_seed, input_data, max_epoch, _) = get_raw_data();
-    let input = get_zklogin_inputs(input_data);
-
-    let google_kid = "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781";
-    let google_jwk_id = JwkId::new(
-        JWKProvider::Google,
-        BoundedVec::<u8, ConstU32<256>>::truncate_from(google_kid.as_bytes().to_vec()),
-    );
-
-    // construct inner zk sig
-    let inner_zk_sig =
-        InnerZkSignature::new(google_jwk_id, input, max_epoch, eph_pubkey.into(), signature.into());
-
-    // the address that excute the call and deducting fee from
-    let address = MultiAddress::from(address_seed);
-
-    let utx = runtime::UncheckedExtrinsic::new_signed(
-        call,
-        address,
-        runtime::Signature::Zk(inner_zk_sig),
-        extra,
-    );
-
-    let encoded = Encode::encode(&utx);
-    println!("sending tx: {}", &hex::encode(encoded));
-
-    utx
+    let _eph_pubkey = eph_signer.public();
+    let (_address_seed, input_data, _max_epoch, _) = get_raw_data();
+    let _input = get_zklogin_inputs(input_data);
+    unimplemented!("We have not prepared a framework to fetch jwk yet.")
 }
 
 /// Generates inherent data for the `benchmark overhead` command.

@@ -81,6 +81,7 @@ pub mod pallet {
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
     {
+        // TODO: provide a valid weight
         #[pallet::call_index(0)]
         #[pallet::weight(0)]
         pub fn submit_zklogin_unsigned(
@@ -189,7 +190,7 @@ where
         // For we has checked the `dispatch_info.class` in `validate_unsigned`, so the check at here is not
         // necessary. We keep this to be same implementation in `Executive`.
         if r.is_err() && dispatch_info.class == DispatchClass::Mandatory {
-            return Err(Error::<T>::InvalidTransaction.into())
+            return Err(Error::<T>::InvalidTransaction.into());
         }
 
         r

@@ -2,13 +2,16 @@
 use crate::zklogin_benchmarking::{
     inherent_benchmark_data, ZkLoginRemarkBuilder, ZkTransferKeepAliveBuilder,
 };
+#[cfg(feature = "runtime-benchmarks")]
+use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
+
 use crate::{
     chain_spec,
     cli::{Cli, Subcommand},
     service,
 };
-use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
-use node_template_runtime::{AccountId, Block};
+
+use node_template_runtime::Block;
 use sc_cli::SubstrateCli;
 use sc_service::PartialComponents;
 
@@ -106,6 +109,7 @@ pub fn run() -> sc_cli::Result<()> {
         }
         #[cfg(feature = "runtime-benchmarks")]
         Some(Subcommand::Benchmark(cmd)) => {
+            use sp_runtime::traits::HashingFor;
             let runner = cli.create_runner(cmd)?;
 
             runner.sync_run(|config| {
@@ -118,10 +122,10 @@ pub fn run() -> sc_cli::Result<()> {
                                 "Runtime benchmarking wasn't enabled when building the node. \
 							You can enable it with `--features zksig-benchmarks`."
                                     .into(),
-                            )
+                            );
                         }
 
-                        cmd.run::<Block, ()>(config)
+                        cmd.run_with_spec::<HashingFor<Block>, ()>(Some(config.chain_spec))
                     }
                     BenchmarkCmd::Block(cmd) => {
                         let PartialComponents { client, .. } = service::new_partial(&config)?;
@@ -155,7 +159,7 @@ pub fn run() -> sc_cli::Result<()> {
                     }
                     BenchmarkCmd::Extrinsic(cmd) => {
                         let PartialComponents { client, .. } = service::new_partial(&config)?;
-                        let receipant = AccountId::from(sp_core::ed25519::Public([0u8; 32]));
+                        let receipant = node_template_runtime::AccountId::from([0u8; 32]);
 
                         // Register the *Remark* and *TKA* builders.
                         let ext_factory = ExtrinsicFactory(vec![
@@ -175,12 +179,6 @@ pub fn run() -> sc_cli::Result<()> {
                 }
             })
         }
-        #[cfg(feature = "try-runtime")]
-        Some(Subcommand::TryRuntime) => Err(try_runtime_cli::DEPRECATION_NOTICE.into()),
-        #[cfg(not(feature = "try-runtime"))]
-        Some(Subcommand::TryRuntime) => Err("TryRuntime wasn't enabled when building the node. \
-				You can enable it with `--features try-zksig`."
-            .into()),
         Some(Subcommand::ChainInfo(cmd)) => {
             let runner = cli.create_runner(cmd)?;
             runner.sync_run(|config| cmd.run::<Block>(&config))
@@ -188,7 +186,18 @@ pub fn run() -> sc_cli::Result<()> {
         None => {
             let runner = cli.create_runner(&cli.run)?;
             runner.run_node_until_exit(|config| async move {
-                service::new_full(config).map_err(sc_cli::Error::Service)
+                match config.network.network_backend {
+                    sc_network::config::NetworkBackendType::Libp2p => service::new_full::<
+                        sc_network::NetworkWorker<
+                            node_template_runtime::opaque::Block,
+                            <node_template_runtime::opaque::Block as sp_runtime::traits::Block>::Hash,
+                        >,
+                    >(config)
+                        .map_err(sc_cli::Error::Service),
+                    sc_network::config::NetworkBackendType::Litep2p =>
+                        service::new_full::<sc_network::Litep2pNetworkBackend>(config)
+                            .map_err(sc_cli::Error::Service),
+                }
             })
         }
     }

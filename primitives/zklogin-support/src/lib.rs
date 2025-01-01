@@ -89,7 +89,7 @@ where
         signer: &<Self::Signer as IdentifyAccount>::AccountId,
     ) -> bool {
         if !self.sig.verify(msg, &AccountId32::from(self.zk_material.get_eph_pubkey())) {
-            return false
+            return false;
         }
 
         // verify zk proof
