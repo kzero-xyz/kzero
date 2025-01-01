@@ -1,7 +1,7 @@
 use crate::{Call as ZkLoginCall, Pallet};
 use frame_executive::Executive;
 use frame_support::{
-    assert_ok,
+    assert_ok, derive_impl,
     dispatch::RawOrigin,
     pallet_prelude::{ConstU32, TypeInfo},
     parameter_types,
@@ -10,15 +10,14 @@ use frame_support::{
 };
 use pallet_balances::Call as BalancesCall;
 use scale_codec::{Decode, Encode};
-use sp_core::{ed25519, Pair, H256};
+use sp_core::{ed25519, Pair};
 use sp_runtime::{
     generic,
     generic::{CheckedExtrinsic, UncheckedExtrinsic},
-    traits::{BlakeTwo256, Checkable, DispatchInfoOf, IdentifyAccount, SignedExtension, Verify},
+    traits::{BlakeTwo256, DispatchInfoOf, IdentifyAccount, SignedExtension, Verify},
     transaction_validity::TransactionValidityError,
     BuildStorage, MultiAddress, MultiSignature,
 };
-use std::str::FromStr;
 use zklogin_support::{
     test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs},
     JWKProvider, JwkId, ZkMaterial,
@@ -78,51 +77,17 @@ parameter_types! {
     pub const BlockHashCount: u32 = 250;
 }
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl frame_system::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
-    type BaseCallFilter = frame_support::traits::Everything;
-    type BlockWeights = ();
-    type BlockLength = ();
-    type RuntimeOrigin = RuntimeOrigin;
-    type RuntimeCall = RuntimeCall;
-    type Nonce = u64;
-    type Hash = H256;
-    type Hashing = BlakeTwo256;
+    type Block = Block;
     type AccountId = AccountId;
     type Lookup = sp_runtime::traits::AccountIdLookup<Self::AccountId, ()>;
-    type Block = Block;
-    type BlockHashCount = BlockHashCount;
-    type DbWeight = ();
-    type Version = ();
-    type PalletInfo = PalletInfo;
     type AccountData = pallet_balances::AccountData<u64>;
-    type OnNewAccount = ();
-    type OnKilledAccount = ();
-    type SystemWeightInfo = ();
-    type SS58Prefix = ();
-    type OnSetCode = ();
-    type MaxConsumers = ConstU32<16>;
 }
 
-parameter_types! {
-    pub const ExistentialDeposit: u64 = 1;
-}
-
+#[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
 impl pallet_balances::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
-    type RuntimeHoldReason = RuntimeHoldReason;
-    type RuntimeFreezeReason = RuntimeFreezeReason;
-    type WeightInfo = ();
-    type Balance = u64;
-    type DustRemoval = ();
-    type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
-    type ReserveIdentifier = [u8; 8];
-    type FreezeIdentifier = ();
-    type MaxLocks = ();
-    type MaxReserves = ();
-    type MaxHolds = ConstU32<1>;
-    type MaxFreezes = ConstU32<1>;
 }
 
 impl super::Config for Test {

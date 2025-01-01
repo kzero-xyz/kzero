@@ -11,7 +11,7 @@ use sc_client_api::BlockBackend;
 use sp_core::{Encode, Pair};
 use sp_inherents::{InherentData, InherentDataProvider};
 use sp_keyring::Sr25519Keyring;
-use sp_runtime::{MultiSignature, OpaqueExtrinsic, SaturatedConversion};
+use sp_runtime::{OpaqueExtrinsic, SaturatedConversion};
 
 use std::{sync::Arc, time::Duration};
 
@@ -23,6 +23,7 @@ pub struct RemarkBuilder {
 }
 
 impl RemarkBuilder {
+    #[allow(unused)]
     /// Creates a new [`Self`] from the given client.
     pub fn new(client: Arc<FullClient>) -> Self {
         Self { client }
@@ -62,6 +63,7 @@ pub struct TransferKeepAliveBuilder {
 }
 
 impl TransferKeepAliveBuilder {
+    #[allow(unused)]
     /// Creates a new [`Self`] from the given client.
     pub fn new(client: Arc<FullClient>, dest: AccountId, value: Balance) -> Self {
         Self { client, dest, value }
@@ -142,7 +144,7 @@ pub fn create_benchmark_extrinsic(
     runtime::UncheckedExtrinsic::new_signed(
         call,
         sp_runtime::AccountId32::from(sender.public()).into(),
-        runtime::Signature::Origin(MultiSignature::Sr25519(signature)),
+        runtime::Signature::Sr25519(signature),
         extra,
     )
 }
