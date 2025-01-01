@@ -44,14 +44,6 @@ build-release:
 build-production:
 	WASM_BUILD_TYPE=production cargo build --profile=production
 
-.PHONY: build-beacon build-beacon-debug build-beacon-release build-beacon-production
-build-beacon build-beacon-debug:
-	WASM_BUILD_TYPE=debug cargo build -p altbeacon
-build-beacon-release:
-	WASM_BUILD_TYPE=release cargo build --release -p altbeacon
-build-beacon-production:
-	WASM_BUILD_TYPE=production cargo build --profile=production -p altbeacon
-
 .PHONY: test test-release
 test:
 	cargo test --lib --all
