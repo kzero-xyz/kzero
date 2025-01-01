@@ -81,6 +81,7 @@ pub mod pallet {
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
     {
+        // TODO: provide a valid weight
         #[pallet::call_index(0)]
         #[pallet::weight(0)]
         pub fn submit_zklogin_unsigned(
