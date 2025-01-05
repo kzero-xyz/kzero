@@ -500,7 +500,7 @@ impl_runtime_apis! {
         }
     }
 
-    #[cfg(feature = "zksig-benchmarks")]
+	#[cfg(feature = "runtime-benchmarks")]
     impl frame_benchmarking::Benchmark<Block> for Runtime {
         fn benchmark_metadata(extra: bool) -> (
             Vec<frame_benchmarking::BenchmarkList>,
@@ -541,7 +541,7 @@ impl_runtime_apis! {
         }
     }
 
-    #[cfg(feature = "try-zksig")]
+    #[cfg(feature = "try-runtime")]
     impl frame_try_runtime::TryRuntime<Block> for Runtime {
         fn on_runtime_upgrade(checks: frame_try_runtime::UpgradeCheckSelect) -> (Weight, Weight) {
             // NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
