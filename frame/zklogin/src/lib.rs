@@ -12,8 +12,8 @@ use sp_runtime::{
     transaction_validity::{InvalidTransaction, TransactionValidityError, UnknownTransaction},
 };
 use sp_std::prelude::*;
-use zklogin_runtime::ReplaceSender;
-use zklogin_support::ZkMaterial;
+// use zklogin_runtime::ReplaceSender;
+use zklogin_support::{ZkMaterial, replace_sender::ReplaceSender};
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
@@ -152,12 +152,13 @@ pub mod pallet {
                         return InvalidTransaction::BadMandatory.into();
                     }
 
-                    // validate zk proof
-                    zk_material
-                        .verify_zk_login(&address_seed)
-                        .map_err(|_| InvalidTransaction::BadProof)?;
-
-                    xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
+                    unimplemented!("We need to fetch jwt at here.")
+                    // // validate zk proof
+                    // zk_material
+                    //     .verify_zk_login(&address_seed)
+                    //     .map_err(|_| InvalidTransaction::BadProof)?;
+                    //
+                    // xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
                 }
                 _ => Err(InvalidTransaction::Call.into()),
             }

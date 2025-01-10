@@ -94,7 +94,7 @@ std = [
     "pallet-transaction-payment-rpc-runtime-api/std",
     "pallet-transaction-payment/std",
     # local pallets
-    "zklogin-runtime/std",
+#    "zklogin-runtime/std",
     "pallet-zklogin/std",
 ]
 runtime-benchmarks = [

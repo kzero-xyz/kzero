@@ -8,12 +8,12 @@ repository.workspace = true
 
 [dependencies]
 # encode/decode
-scale-codec = { workspace = true, default-features = false, features = ["derive"] }
-scale-info = { workspace = true, default-features = false, features = ["derive"] }
-serde_json = { workspace = true, optional = true }
+scale-codec = { workspace = true, features = ["derive"] }
+scale-info = { workspace = true, features = ["derive"] }
+#serde_json = { workspace = true }
 # ser/deser
 base64ct = { version = "1.5.3", features = ["alloc"] }
-serde = { workspace = true, optional = true }
+#serde = { workspace = true, optional = true }
 
 # zk primitives
 ark-bn254 = { version = "0.4.0", default-features = false, features = ["curve"] }
@@ -31,6 +31,12 @@ sp-io = { workspace = true }
 sp-runtime = { workspace = true }
 sp-std = { workspace = true }
 
+# jwk
+jsonwebtoken = { workspace = true }
+
+[dev-dependencies]
+serde = { workspace = true, features = ["std", "derive"] }
+
 [features]
 runtime-benchmarks = [
     "sp-runtime/runtime-benchmarks",
@@ -42,8 +48,7 @@ default = ["std"]
 std = [
     "scale-codec/std",
     "scale-info/std",
-    "serde/std",
-    "serde_json/std",
+#    "serde_json/std",
     "base64ct/std",
     # zk primitives
     "ark-crypto-primitives/std",
@@ -59,11 +64,13 @@ std = [
     "sp-core/std",
     "sp-io/std",
     "sp-std/std",
+    # jwk
+    "jsonwebtoken/std",
 ]
 testing = []
 # Serde support without relying on std features.
 serde = [
-    "dep:serde",
+#    "dep:serde",
     "scale-info/serde",
     "sp-core/serde",
     "sp-runtime/serde",

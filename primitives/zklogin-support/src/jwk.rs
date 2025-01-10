@@ -210,21 +210,21 @@ pub struct JWK {
     pub alg: &'static str,
 }
 
-pub(crate) fn get_modulo(jwk_id: &JwkId) -> ZkAuthResult<JWK> {
-    let jwk_list = match jwk_id.provider {
-        JWKProvider::Google => GOOGLE_JWK_LIST.to_vec(),
-        JWKProvider::Twitch => TWITCH_JWK_LIST.to_vec(),
-        JWKProvider::Facebook => FACEBOOK_JWK_LIST.to_vec(),
-        JWKProvider::Kakao => KAKAO_JWT_LIST.to_vec(),
-        JWKProvider::Apple => APPLE_JWT_LIST.to_vec(),
-        JWKProvider::Slack => SLACK_JWT_LIST.to_vec(),
-    };
-
-    jwk_list
-        .into_iter()
-        .find(|jwk| {
-            jwk_id.kid
-                == BoundedVec::<u8, ConstU32<256>>::truncate_from(jwk.kid.as_bytes().to_vec())
-        })
-        .ok_or(ZkAuthError::JWKNotFound)
-}
+// pub(crate) fn get_modulo(jwk_id: &JwkId) -> ZkAuthResult<JWK> {
+//     let jwk_list = match jwk_id.provider {
+//         JWKProvider::Google => GOOGLE_JWK_LIST.to_vec(),
+//         JWKProvider::Twitch => TWITCH_JWK_LIST.to_vec(),
+//         JWKProvider::Facebook => FACEBOOK_JWK_LIST.to_vec(),
+//         JWKProvider::Kakao => KAKAO_JWT_LIST.to_vec(),
+//         JWKProvider::Apple => APPLE_JWT_LIST.to_vec(),
+//         JWKProvider::Slack => SLACK_JWT_LIST.to_vec(),
+//     };
+//
+//     jwk_list
+//         .into_iter()
+//         .find(|jwk| {
+//             jwk_id.kid
+//                 == BoundedVec::<u8, ConstU32<256>>::truncate_from(jwk.kid.as_bytes().to_vec())
+//         })
+//         .ok_or(ZkAuthError::JWKNotFound)
+// }

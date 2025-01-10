@@ -3476,6 +3476,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonwebtoken"
+version = "9.3.0"
+source = "git+https://github.com/mimir-labs/jsonwebtoken?branch=no_std_v9.3.0#8b495b45e6b4b0307ccf85ec4b6ff7639a7c7650"
+dependencies = [
+ "base64 0.21.6",
+ "parity-scale-codec",
+ "ring 0.17.7",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "k256"
 version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5289,7 +5301,6 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
- "zklogin-runtime",
  "zklogin-support",
 ]
 
@@ -10652,12 +10663,12 @@ dependencies = [
  "ark-relations",
  "base64ct",
  "ff",
+ "jsonwebtoken",
  "num-bigint 0.4.4",
  "parity-scale-codec",
  "poseidon-ark",
  "scale-info",
  "serde",
- "serde_json",
  "sp-core",
  "sp-io",
  "sp-runtime",

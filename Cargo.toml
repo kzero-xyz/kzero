@@ -20,7 +20,7 @@ repository = "https://github.com/alt-research/multi-seq"
 scale-codec = { package = "parity-scale-codec", version = "3.6.12", default-features = false }
 scale-info = { version = "2.9.0", default-features = false }
 serde = { version = "1.0.194", default-features = false, features = ["alloc", "derive"] }
-serde_json = "1.0.111"
+serde_json = { version = "1.0.111", default-features = false, features = ["alloc"] }
 # Substrate (Client)
 sc-basic-authorship = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2407" }
 sc-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2407" }
@@ -79,10 +79,13 @@ frame-benchmarking-cli = { git = "https://github.com/paritytech/polkadot-sdk", b
 substrate-build-script-utils = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2407" }
 substrate-frame-rpc-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2407" }
 substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2407" }
+# jwk
+jsonwebtoken = { git = "https://github.com/mimir-labs/jsonwebtoken", branch = "no_std_v9.3.0", default-features = false, features = ["codec"] }
+#jsonwebtoken = { path = "../jsonwebtoken", default-features = false, features = ["codec"] }
 
 # Local
 node-template = { path = "./node" }
 node-template-runtime = { path = "./runtime", default-features = false }
 pallet-zklogin = { path = "./frame/zklogin", default-features = false }
-zklogin-runtime = { path = "./primitives/zklogin-runtime", default-features = false }
+#zklogin-runtime = { path = "./primitives/zklogin-runtime", default-features = false }
 zklogin-support = { path = "./primitives/zklogin-support", default-features = false }
