@@ -1,5 +1,5 @@
 [package]
-name = "zklogin-support"
+name = "primitive-zklogin"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -48,7 +48,7 @@ default = ["std"]
 std = [
     "scale-codec/std",
     "scale-info/std",
-#    "serde_json/std",
+    #    "serde_json/std",
     "base64ct/std",
     # zk primitives
     "ark-crypto-primitives/std",
@@ -70,7 +70,7 @@ std = [
 testing = []
 # Serde support without relying on std features.
 serde = [
-#    "dep:serde",
+    #    "dep:serde",
     "scale-info/serde",
     "sp-core/serde",
     "sp-runtime/serde",

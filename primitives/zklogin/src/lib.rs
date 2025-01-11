@@ -17,27 +17,28 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{crypto::AccountId32, U256};
-use sp_runtime::{RuntimeDebug};
+use sp_runtime::RuntimeDebug;
 
 pub use error::{ZkAuthError, ZkAuthResult};
 pub use zk_input::ZkLoginInputs;
 
-pub use jsonwebtoken::jwk::Jwk;
-pub use jsonwebtoken::jwk::AlgorithmParameters;
-pub use jsonwebtoken::errors::ErrorKind;
+pub use jsonwebtoken::{
+    errors::ErrorKind,
+    jwk::{AlgorithmParameters, Jwk},
+};
 
 mod circom;
 mod error;
 // mod jwk;
 mod poseidon;
 mod pvk;
+pub mod replace_sender;
 #[cfg(feature = "testing")]
 pub mod test_helper;
 #[cfg(test)]
 mod tests;
 mod utils;
 mod zk_input;
-pub mod replace_sender;
 
 pub const PACK_WIDTH: u8 = 248;
 pub const EPH_PUB_KEY_LEN: usize = 32;
@@ -164,11 +165,12 @@ impl ZkMaterial {
     pub fn get_ephkey_expire_at(&self) -> u32 {
         return self.ephkey_expire_at;
     }
-    /// entry to handle zklogin-support proof verification
+    /// entry to handle zklogin proof verification
     pub fn verify_zk_login(&self, address_seed: &AccountId32, jwk: &Jwk) -> ZkAuthResult<()> {
         let modulus = if let AlgorithmParameters::RSA(ref key_params) = jwk.algorithm {
             // Decode modulus to bytes.
-            Base64UrlUnpadded::decode_vec(&key_params.n).map_err(|_| ZkAuthError::ModulusDecodeError)?
+            Base64UrlUnpadded::decode_vec(&key_params.n)
+                .map_err(|_| ZkAuthError::ModulusDecodeError)?
         } else {
             return Err(ZkAuthError::UnsupportedAlgorithm)
         };
@@ -191,7 +193,7 @@ impl ZkMaterial {
     }
 }
 
-/// Verify zklogin-support proof with pvk in production
+/// Verify zklogin proof with pvk in production
 fn verify_zklogin_proof_in_prod(
     proof: &Proof<Bn254>,
     public_inputs: &[Bn254Fr],

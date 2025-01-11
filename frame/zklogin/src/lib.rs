@@ -12,8 +12,8 @@ use sp_runtime::{
     transaction_validity::{InvalidTransaction, TransactionValidityError, UnknownTransaction},
 };
 use sp_std::prelude::*;
-// use zklogin_runtime::ReplaceSender;
-use zklogin_support::{ZkMaterial, replace_sender::ReplaceSender};
+
+use primitive_zklogin::{replace_sender::ReplaceSender, ZkMaterial};
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
@@ -147,7 +147,7 @@ pub mod pallet {
                     xt.replace_sender(address_seed.clone());
                     // Decode parameters and dispatch
                     let dispatch_info = xt.get_dispatch_info();
-                    // Check dispatch_class: mandatory extrinsic is not allowed to use zklogin-support
+                    // Check dispatch_class: mandatory extrinsic is not allowed to use zklogin
                     if dispatch_info.class == DispatchClass::Mandatory {
                         return InvalidTransaction::BadMandatory.into();
                     }

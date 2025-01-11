@@ -4796,6 +4796,7 @@ dependencies = [
  "node-template-runtime",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc",
+ "primitive-zklogin",
  "sc-basic-authorship",
  "sc-cli",
  "sc-client-api",
@@ -4824,7 +4825,6 @@ dependencies = [
  "sp-timestamp",
  "substrate-build-script-utils",
  "substrate-frame-rpc-system",
- "zklogin-support",
 ]
 
 [[package]]
@@ -4864,7 +4864,6 @@ dependencies = [
  "sp-transaction-pool",
  "sp-version",
  "substrate-wasm-builder",
- "zklogin-runtime",
 ]
 
 [[package]]
@@ -5296,12 +5295,12 @@ dependencies = [
  "log",
  "pallet-balances",
  "parity-scale-codec",
+ "primitive-zklogin",
  "scale-info",
  "sp-core",
  "sp-io",
  "sp-runtime",
  "sp-std",
- "zklogin-support",
 ]
 
 [[package]]
@@ -5801,6 +5800,29 @@ dependencies = [
  "impl-serde",
  "scale-info",
  "uint",
+]
+
+[[package]]
+name = "primitive-zklogin"
+version = "0.1.0"
+dependencies = [
+ "ark-bn254",
+ "ark-crypto-primitives",
+ "ark-ff",
+ "ark-groth16",
+ "ark-relations",
+ "base64ct",
+ "ff",
+ "jsonwebtoken",
+ "num-bigint 0.4.4",
+ "parity-scale-codec",
+ "poseidon-ark",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]
@@ -9366,7 +9388,6 @@ dependencies = [
  "parity-scale-codec",
  "sp-core",
  "sp-runtime",
- "zklogin-support",
 ]
 
 [[package]]
@@ -10640,39 +10661,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.89",
-]
-
-[[package]]
-name = "zklogin-runtime"
-version = "0.1.0"
-dependencies = [
- "parity-scale-codec",
- "scale-info",
- "sp-runtime",
- "zklogin-support",
-]
-
-[[package]]
-name = "zklogin-support"
-version = "0.1.0"
-dependencies = [
- "ark-bn254",
- "ark-crypto-primitives",
- "ark-ff",
- "ark-groth16",
- "ark-relations",
- "base64ct",
- "ff",
- "jsonwebtoken",
- "num-bigint 0.4.4",
- "parity-scale-codec",
- "poseidon-ark",
- "scale-info",
- "serde",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "sp-std",
 ]
 
 [[package]]

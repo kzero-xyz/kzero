@@ -1,10 +1,9 @@
 [workspace]
 members = [
     "node",
-    "primitives/zklogin-support",
+    "primitives/zklogin",
     "runtime",
     "frame/zklogin",
-    "primitives/zklogin-runtime",
     "tests/tool",
 ]
 resolver = "2"
@@ -81,11 +80,9 @@ substrate-frame-rpc-system = { git = "https://github.com/paritytech/polkadot-sdk
 substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2407" }
 # jwk
 jsonwebtoken = { git = "https://github.com/mimir-labs/jsonwebtoken", branch = "no_std_v9.3.0", default-features = false, features = ["codec"] }
-#jsonwebtoken = { path = "../jsonwebtoken", default-features = false, features = ["codec"] }
 
 # Local
 node-template = { path = "./node" }
 node-template-runtime = { path = "./runtime", default-features = false }
 pallet-zklogin = { path = "./frame/zklogin", default-features = false }
-#zklogin-runtime = { path = "./primitives/zklogin-runtime", default-features = false }
-zklogin-support = { path = "./primitives/zklogin-support", default-features = false }
+primitive-zklogin = { path = "primitives/zklogin", default-features = false }

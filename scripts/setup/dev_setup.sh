@@ -6,7 +6,7 @@ sudo apt-get install -y build-essential cmake pkg-config llvm-dev libclang-dev c
 arch=$(uname -m)
 ARCH=$arch
 if [ 'x86_64' = "$arch" ]; then
-  ARCH=amd64
+  ARCH=x86_64
 fi
 if [ 'aarch64' = "$arch" ]; then
   ARCH=aarch64
@@ -47,7 +47,7 @@ install_cargo_binary "cargo-expand"
 if command -v "taplo" &> /dev/null; then
   echo "taplo is already installed"
 else
-  wget https://github.com/tamasfe/taplo/releases/download/0.8.1/taplo-${os}-${ARCH}.gz -O taplo.gz
+  wget https://github.com/tamasfe/taplo/releases/download/0.9.3/taplo-full-${os}-${ARCH}.gz -O taplo.gz
   gzip -d taplo.gz
   chmod +x taplo
   mv taplo $HOME/.cargo/bin/taplo
