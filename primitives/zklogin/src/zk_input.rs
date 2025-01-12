@@ -61,7 +61,7 @@ impl ZkLoginInputs {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
 pub struct Claim {
     pub(crate) value: U256,
@@ -70,7 +70,7 @@ pub struct Claim {
 
 /// The struct for zk login proof.
 // TODO add construct func
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
 pub struct ZkLoginProof {
     pub(crate) a: CircomG1,

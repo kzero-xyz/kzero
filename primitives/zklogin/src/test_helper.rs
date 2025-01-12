@@ -193,7 +193,7 @@ pub fn get_test_eph_key() -> Ed25519Pair {
 }
 
 pub fn get_raw_data() -> (AccountId32, String, u32, [u8; 32]) {
-    let user_salt = "25299916604528864863320632865981";
+    let user_salt = "6903439401297002981078976741241818963710729444388942281949823152082404716376301797176193848";
 
     let address_seed = gen_address_seed(
         user_salt,
@@ -208,47 +208,85 @@ pub fn get_raw_data() -> (AccountId32, String, u32, [u8; 32]) {
     let address_seed = AccountId32::from(s);
 
     let proof_data = r#"{
-  "proof_points": {
-    "a": [
-  "17616682682255357725236699983875872960512785786242320601171601173839632397561",
-  "11076441919079288018127270006134582082002492398242835479200754329782779311412",
-  "1"
- ],
- "b": [
-  [
-   "15750799913314319906554913000001674780287560333733376355393117305292557344402",
-   "7677100283383985411095485561638869696407359395040297716795950130044402089559"
-  ],
-  [
-   "18606008584639636091769541269513828219729021727172187250519784492187757221329",
-   "7450490194721479634965392697445931199768165294600472583352791767135577586668"
-  ],
-  [
-   "1",
-   "0"
-  ]
- ],
- "c": [
-  "15744595279404751158541153483516847825612138891658986041039712463550705025107",
-  "19067483624355547312371615836004025957967385810846181068096877349084672211238",
-  "1"
- ]
-  },
-  "header": "6213488905372788847972833745272380033714613998405015819845360097082872955254",
-  "iss_base64_details": {
-    "index_mod_4": 1,
-    "value": "17369902616279740791204861702455537230599532803600308871388405295273096679389"
-  }
-}
-"#;
+        "proof_points": {
+            "a": [
+            "9381813773171450462648323179981700992482234003937252912184366692176647122440",
+            "17135816274588842394987740577348746744124536487185243735653495512098467176682",
+            "1"
+            ],
+            "b": [
+            [
+            "12007654400896864202053137919011753862685795325094057089804209969395451364237",
+            "9292143971825249679511504837978464260231784546642825774684216241262448276692"
+            ],
+            [
+            "2739509173985286250590833064309803350595900462807230565709419062550672100574",
+            "9617502836905847049711738720668642526073457745474007398904997426591688823762"
+            ],
+            [
+            "1",
+            "0"
+            ]
+            ],
+            "c": [
+            "4236607764644869062435426868625747082828648484430168905284460458292661376562",
+            "13765193476064868657640379803797505779241026862161166609423648103540137745710",
+            "1"
+            ]
+        },
+        "iss_base64_details": {
+            "value" : "17369902616279740791204861702455537230599532803600308871388405295273096679389",
+            "index_mod_4": 1
+        },
+        "header": "913143068733459984664279033783989157259274322902058410967852973431920544493"
+    }"#;
 
-    let max_epoch: u32 = 190;
+    let max_epoch: u32 = 834;
     let eph_pubkey_bytes: [u8; 32] = get_test_eph_key().public().0;
 
-    return (address_seed, proof_data.to_owned(), max_epoch, eph_pubkey_bytes);
+    (address_seed, proof_data.to_owned(), max_epoch, eph_pubkey_bytes)
 }
 
 pub fn get_zklogin_inputs(proof_data: String) -> ZkLoginInputs {
     let input = ZkLoginInputs::from_json(&proof_data).expect("wrong json parse");
     input
+}
+
+pub mod test_cases {
+    use crate::{jwk_from_slice, Jwk, Kid};
+    pub mod google {
+        use super::*;
+        pub const GOOGLE_JWK_JSON_LIST: [&str; 2] = [
+            r#"{
+                "kty": "RSA",
+                "e": "AQAB",
+                "kid": "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781",
+                "n": "tgkwz0K80MycaI2Dz_jHkErJ_IHUPTlx4LR_6wltAHQW_ZwhMzINNH8vbWo8P5F2YLDiIbuslF9y7Q3izsPX3XWQyt6LI8ZT4gmGXQBumYMKx2VtbmTYIysKY8AY7x5UCDO-oaAcBuKQvWc5E31kXm6d6vfaEZjrMc_KT3DsFdN0LcAkB-Q9oYcVl7YEgAN849ROKUs6onf7eukj1PHwDzIBgA9AExJaKen0wITvxQv3H_BRXB7m6hFkLbK5Jo18gl3UxJ7Em29peEwi8Psn7MuI7CwhFNchKhjZM9eaMX27tpDPqR15-I6CA5Zf94rabUGWYph5cFXKWPPr8dskQQ",
+                "alg": "RS256"
+            }"#,
+            r#"{
+                "kty": "RSA",
+                "n": "qwrzl06fwB6OIm62IxNG7NXNIDmgdBrvf09ob2Gsp6ZmAXgU4trHPUYrdBaAlU5aHpchXCf_mVL-U5dzRqeVFQsVqsj4PEIE6E5OPw8EwumP2fzLQSswpkKmJJKFcdncfQ730QBonRUEhKkIbiYdicJl5yTkORd0_BmfdLV98r-sEwEHN4lzTJ15-yw90ob_R6vAH4wPyCSN3Xe5_zV6R4ENL2NlKn2HT9lbV7HhtQongea8wfnthUhdZH38kI4SS5nAaCVNxEAzlvJtUIdCpSgjUgcbah-DwY39l4D800kLxkcF2CGXPSmpF8GPs1aWSsYupY8sTSy9qCFJFPFx8Q",
+                "kid": "48a63bc4767f8550a532dc630cf7eb49ff397e7c",
+                "e": "AQAB",
+                "alg": "RS256"
+            }"#,
+        ];
+
+        pub fn jwks() -> Vec<Jwk> {
+            GOOGLE_JWK_JSON_LIST
+                .into_iter()
+                .map(|s| jwk_from_slice(s.as_bytes()).expect("Test case muse be a valid jwk"))
+                .collect()
+        }
+
+        pub fn kids() -> Vec<Kid> {
+            jwks()
+                .into_iter()
+                .map(|jwk| {
+                    jwk.common.key_id.expect("Test case JWK must has kid").as_bytes().to_vec()
+                })
+                .collect()
+        }
+    }
 }

@@ -33,6 +33,9 @@ pub enum ZkAuthError {
     /// Onchain address parse Error
     AddressParseError,
 
+    /// Zklogin only support RSA algorithm for JWT.
+    UnsupportedAlgorithm,
+
     TestError(()),
 }
 

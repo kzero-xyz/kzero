@@ -5,7 +5,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use crate::{
-    jwk::get_modulo,
     pvk::{prod_pvk, test_pvk},
     zk_input::Bn254Fr,
 };
@@ -13,26 +12,30 @@ use ark_bn254::Bn254;
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::{Groth16, Proof};
 use base64ct::{Base64UrlUnpadded, Encoding};
+
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{crypto::AccountId32, U256};
-use sp_runtime::{
-    traits::{IdentifyAccount, Lazy, Verify},
-    RuntimeDebug,
-};
+use sp_runtime::RuntimeDebug;
+use sp_std::vec::Vec;
 
 pub use error::{ZkAuthError, ZkAuthResult};
-pub use jwk::{JWKProvider, JwkId};
 pub use zk_input::ZkLoginInputs;
+
+pub use jsonwebtoken::{
+    errors::ErrorKind,
+    jwk::{AlgorithmParameters, Jwk},
+};
 
 mod circom;
 mod error;
-mod jwk;
+// mod jwk;
 mod poseidon;
 mod pvk;
-#[cfg(feature = "std")]
+pub mod replace_sender;
+#[cfg(feature = "testing")]
 pub mod test_helper;
-#[cfg(test)]
+#[cfg(all(test, feature = "testing"))]
 mod tests;
 mod utils;
 mod zk_input;
@@ -42,6 +45,43 @@ pub const EPH_PUB_KEY_LEN: usize = 32;
 
 /// The Ephemeral Public Key should be [u8; 32]
 pub type PubKey = [u8; EPH_PUB_KEY_LEN];
+
+/// Parse Jwk from a json bytes.
+pub fn jwk_from_slice(json: &[u8]) -> serde_json::Result<Jwk> {
+    serde_json::from_slice(json)
+}
+
+#[derive(
+    Encode,
+    Decode,
+    RuntimeDebug,
+    MaxEncodedLen,
+    TypeInfo,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    PartialOrd,
+    Ord
+)]
+pub enum JwkProvider {
+    /// See https://accounts.google.com/.well-known/openid-configuration
+    Google,
+    /// See https://id.twitch.tv/oauth2/.well-known/openid-configuration
+    Twitch,
+    /// See https://www.facebook.com/.well-known/openid-configuration/
+    Facebook,
+    /// See https://kauth.kakao.com/.well-known/openid-configuration
+    Kakao,
+    /// See https://appleid.apple.com/.well-known/openid-configuration
+    Apple,
+    /// See https://slack.com/.well-known/openid-configuration
+    Slack,
+}
+
+/// Kid is a String in spec, we use `Bytes` to present it.
+/// For now, the max length for Kid is 43, which comes from Slack.
+pub type Kid = Vec<u8>;
 
 #[derive(Debug, Clone)]
 pub enum ZkLoginEnv {
@@ -58,51 +98,15 @@ impl Default for ZkLoginEnv {
     }
 }
 
-#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
-pub struct Signature<S> {
-    zk_material: ZkMaterial,
-    sig: S,
-}
-
-impl<S> Signature<S> {
-    pub fn new(
-        source: JwkId,
-        inputs: ZkLoginInputs,
-        ephkey_expire_at: u32,
-        eph_pubkey: [u8; 32],
-        sig: S,
-    ) -> Self {
-        Self { zk_material: ZkMaterial::new(source, inputs, ephkey_expire_at, eph_pubkey), sig }
-    }
-}
-
-impl<S> Verify for Signature<S>
-where
-    S: Verify,
-    S::Signer: IdentifyAccount<AccountId = AccountId32>,
-{
-    type Signer = S::Signer;
-
-    fn verify<L: Lazy<[u8]>>(
-        &self,
-        msg: L,
-        signer: &<Self::Signer as IdentifyAccount>::AccountId,
-    ) -> bool {
-        if !self.sig.verify(msg, &AccountId32::from(self.zk_material.get_eph_pubkey())) {
-            return false;
-        }
-
-        // verify zk proof
-        self.zk_material.verify_zk_login(signer).is_ok()
-    }
-}
-
 /// The material that is used for zkproof verification
-#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
+#[derive(Encode, Decode, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
 pub struct ZkMaterial {
-    /// (JwtProvider,kid) that is used to get the corresponding `n`, which
+    // source: (JwkProvider, Kid),
+    /// (JwkProvider,kid) that is used to get the corresponding `n`, which
     /// will be used in zk proof verification
-    source: JwkId,
+    provider: JwkProvider,
+    /// Kid for this JwkProvider.
+    kid: Kid,
     /// ZkProof
     inputs: ZkLoginInputs,
     /// When the ephemeral key is expired
@@ -114,12 +118,25 @@ pub struct ZkMaterial {
 
 impl ZkMaterial {
     pub fn new(
-        source: JwkId,
+        provider: JwkProvider,
+        kid: Kid,
         inputs: ZkLoginInputs,
         ephkey_expire_at: u32,
         eph_pubkey: [u8; 32],
     ) -> Self {
-        Self { source, inputs, ephkey_expire_at, eph_pubkey }
+        Self { provider, kid, inputs, ephkey_expire_at, eph_pubkey }
+    }
+
+    pub fn get_provider(&self) -> JwkProvider {
+        self.provider
+    }
+
+    pub fn kid(&self) -> &Kid {
+        &self.kid
+    }
+
+    pub fn source(&self) -> (JwkProvider, &Kid) {
+        (self.provider, &self.kid)
     }
 
     pub fn get_eph_pubkey(&self) -> PubKey {
@@ -129,15 +146,15 @@ impl ZkMaterial {
     pub fn get_ephkey_expire_at(&self) -> u32 {
         return self.ephkey_expire_at;
     }
-    /// entry to handle zklogin-support proof verification
-    pub fn verify_zk_login(&self, address_seed: &AccountId32) -> ZkAuthResult<()> {
-        // Load the expected JWK.
-        // now supports Google, Twitch, Facebook, Apple, Slack,
-        let jwk = get_modulo(&self.source)?;
-
-        // Decode modulus to bytes.
-        let modulus =
-            Base64UrlUnpadded::decode_vec(&jwk.n).map_err(|_| ZkAuthError::ModulusDecodeError)?;
+    /// entry to handle zklogin proof verification
+    pub fn verify_zk_login(&self, address_seed: &AccountId32, jwk: &Jwk) -> ZkAuthResult<()> {
+        let modulus = if let AlgorithmParameters::RSA(ref key_params) = jwk.algorithm {
+            // Decode modulus to bytes.
+            Base64UrlUnpadded::decode_vec(&key_params.n)
+                .map_err(|_| ZkAuthError::ModulusDecodeError)?
+        } else {
+            return Err(ZkAuthError::UnsupportedAlgorithm)
+        };
 
         let address_seed_u256 = U256::from_big_endian(address_seed.as_ref());
 
@@ -157,7 +174,7 @@ impl ZkMaterial {
     }
 }
 
-/// Verify zklogin-support proof with pvk in production
+/// Verify zklogin proof with pvk in production
 fn verify_zklogin_proof_in_prod(
     proof: &Proof<Bn254>,
     public_inputs: &[Bn254Fr],

@@ -1,5 +1,5 @@
 [package]
-name = "zklogin-support"
+name = "primitive-zklogin"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -7,13 +7,14 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
+# serde
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true }
 # encode/decode
-scale-codec = { workspace = true, default-features = false, features = ["derive"] }
-scale-info = { workspace = true, default-features = false, features = ["derive"] }
-serde_json = { workspace = true, optional = true }
-# ser/deser
+scale-codec = { workspace = true, features = ["derive"] }
+scale-info = { workspace = true, features = ["derive"] }
+# others
 base64ct = { version = "1.5.3", features = ["alloc"] }
-serde = { workspace = true, optional = true }
 
 # zk primitives
 ark-bn254 = { version = "0.4.0", default-features = false, features = ["curve"] }
@@ -31,6 +32,12 @@ sp-io = { workspace = true }
 sp-runtime = { workspace = true }
 sp-std = { workspace = true }
 
+# jwk
+jsonwebtoken = { workspace = true }
+
+[dev-dependencies]
+serde = { workspace = true, features = ["std", "derive"] }
+
 [features]
 runtime-benchmarks = [
     "sp-runtime/runtime-benchmarks",
@@ -40,10 +47,12 @@ try-runtime = [
 ]
 default = ["std"]
 std = [
+    # serde
+    "serde_json/std",
+    # encode/decode
     "scale-codec/std",
     "scale-info/std",
-    "serde/std",
-    "serde_json/std",
+    # others
     "base64ct/std",
     # zk primitives
     "ark-crypto-primitives/std",
@@ -59,12 +68,9 @@ std = [
     "sp-core/std",
     "sp-io/std",
     "sp-std/std",
+    # jwk
+    "jsonwebtoken/std",
 ]
-testing = []
-# Serde support without relying on std features.
-serde = [
-    "dep:serde",
-    "scale-info/serde",
-    "sp-core/serde",
-    "sp-runtime/serde",
+testing = [
+    "serde/std",
 ]
