@@ -5,7 +5,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use crate::{
-    // jwk::get_modulo,
     pvk::{prod_pvk, test_pvk},
     zk_input::Bn254Fr,
 };
@@ -18,6 +17,7 @@ use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{crypto::AccountId32, U256};
 use sp_runtime::RuntimeDebug;
+use sp_std::vec::Vec;
 
 pub use error::{ZkAuthError, ZkAuthResult};
 pub use zk_input::ZkLoginInputs;
@@ -46,6 +46,11 @@ pub const EPH_PUB_KEY_LEN: usize = 32;
 /// The Ephemeral Public Key should be [u8; 32]
 pub type PubKey = [u8; EPH_PUB_KEY_LEN];
 
+/// Parse Jwk from a json bytes.
+pub fn jwk_from_slice(json: &[u8]) -> serde_json::Result<Jwk> {
+    serde_json::from_slice(json)
+}
+
 #[derive(
     Encode,
     Decode,
@@ -59,7 +64,7 @@ pub type PubKey = [u8; EPH_PUB_KEY_LEN];
     PartialOrd,
     Ord
 )]
-pub enum JWKProvider {
+pub enum JwkProvider {
     /// See https://accounts.google.com/.well-known/openid-configuration
     Google,
     /// See https://id.twitch.tv/oauth2/.well-known/openid-configuration
@@ -74,9 +79,9 @@ pub enum JWKProvider {
     Slack,
 }
 
-/// JwkId is a String in spec, we use `Bytes` to present it.
-/// For now, the max length for JwkId is 43, which comes from Slack.
-pub type JwkId = sp_std::vec::Vec<u8>;
+/// Kid is a String in spec, we use `Bytes` to present it.
+/// For now, the max length for Kid is 43, which comes from Slack.
+pub type Kid = Vec<u8>;
 
 #[derive(Debug, Clone)]
 pub enum ZkLoginEnv {
@@ -93,52 +98,15 @@ impl Default for ZkLoginEnv {
     }
 }
 
-// #[derive(Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
-// pub struct Signature<S> {
-//     zk_material: ZkMaterial,
-//     sig: S,
-// }
-//
-// impl<S> Signature<S> {
-//     pub fn new(
-//         source: JwkId,
-//         inputs: ZkLoginInputs,
-//         ephkey_expire_at: u32,
-//         eph_pubkey: [u8; 32],
-//         sig: S,
-//     ) -> Self {
-//         Self { zk_material: ZkMaterial::new(source, inputs, ephkey_expire_at, eph_pubkey), sig }
-//     }
-// }
-
-// impl<S> Verify for Signature<S>
-// where
-//     S: Verify,
-//     S::Signer: IdentifyAccount<AccountId = AccountId32>,
-// {
-//     type Signer = S::Signer;
-//
-//     fn verify<L: Lazy<[u8]>>(
-//         &self,
-//         msg: L,
-//         signer: &<Self::Signer as IdentifyAccount>::AccountId,
-//     ) -> bool {
-//         if !self.sig.verify(msg, &AccountId32::from(self.zk_material.get_eph_pubkey())) {
-//             return false;
-//         }
-//
-//         // verify zk proof
-//         // self.zk_material.verify_zk_login(signer).is_ok()
-//         unimplemented!("We need to fetch jwt at here.")
-//     }
-// }
-
 /// The material that is used for zkproof verification
 #[derive(Encode, Decode, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
 pub struct ZkMaterial {
-    /// (JwtProvider,kid) that is used to get the corresponding `n`, which
+    // source: (JwkProvider, Kid),
+    /// (JwkProvider,kid) that is used to get the corresponding `n`, which
     /// will be used in zk proof verification
-    source: JwkId,
+    provider: JwkProvider,
+    /// Kid for this JwkProvider.
+    kid: Kid,
     /// ZkProof
     inputs: ZkLoginInputs,
     /// When the ephemeral key is expired
@@ -150,12 +118,25 @@ pub struct ZkMaterial {
 
 impl ZkMaterial {
     pub fn new(
-        source: JwkId,
+        provider: JwkProvider,
+        kid: Kid,
         inputs: ZkLoginInputs,
         ephkey_expire_at: u32,
         eph_pubkey: [u8; 32],
     ) -> Self {
-        Self { source, inputs, ephkey_expire_at, eph_pubkey }
+        Self { provider, kid, inputs, ephkey_expire_at, eph_pubkey }
+    }
+
+    pub fn get_provider(&self) -> JwkProvider {
+        self.provider
+    }
+
+    pub fn kid(&self) -> &Kid {
+        &self.kid
+    }
+
+    pub fn source(&self) -> (JwkProvider, &Kid) {
+        (self.provider, &self.kid)
     }
 
     pub fn get_eph_pubkey(&self) -> PubKey {

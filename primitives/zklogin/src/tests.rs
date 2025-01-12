@@ -1,5 +1,5 @@
 use crate::{
-    jwk::{JWKProvider, JwkId},
+    jwk::{JwkProvider, Kid},
     test_helper::{get_raw_data, get_zklogin_inputs},
     ZkMaterial,
 };
@@ -11,8 +11,8 @@ fn verify_zklogin() {
     let input = get_zklogin_inputs(input_data);
 
     let google_kid = "5aaff47c21d06e266cce395b2145c7c6d4730ea5";
-    let google_jwk_id = JwkId::new(
-        JWKProvider::Google,
+    let google_jwk_id = Kid::new(
+        JwkProvider::Google,
         BoundedVec::<u8, ConstU32<256>>::truncate_from(google_kid.as_bytes().to_vec()),
     );
 

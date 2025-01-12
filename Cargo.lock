@@ -3478,11 +3478,12 @@ dependencies = [
 [[package]]
 name = "jsonwebtoken"
 version = "9.3.0"
-source = "git+https://github.com/mimir-labs/jsonwebtoken?branch=no_std_v9.3.0#8b495b45e6b4b0307ccf85ec4b6ff7639a7c7650"
+source = "git+https://github.com/mimir-labs/jsonwebtoken?branch=no_std_v9.3.0#0f29e31f50d6fad9f8360db24f60b8217df6f10d"
 dependencies = [
  "base64 0.21.6",
  "parity-scale-codec",
  "ring 0.17.7",
+ "scale-info",
  "serde",
  "serde_json",
 ]
@@ -5297,6 +5298,7 @@ dependencies = [
  "parity-scale-codec",
  "primitive-zklogin",
  "scale-info",
+ "serde_json",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -5819,6 +5821,7 @@ dependencies = [
  "poseidon-ark",
  "scale-info",
  "serde",
+ "serde_json",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -9386,6 +9389,7 @@ dependencies = [
  "node-template",
  "pallet-transaction-payment",
  "parity-scale-codec",
+ "primitive-zklogin",
  "sp-core",
  "sp-runtime",
 ]

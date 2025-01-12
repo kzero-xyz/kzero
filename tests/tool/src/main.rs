@@ -1,4 +1,3 @@
-use frame_support::{pallet_prelude::ConstU32, BoundedVec};
 use scale_codec::Encode;
 use sp_core::{Pair, H256};
 use sp_runtime::generic::Era;
@@ -7,9 +6,9 @@ use node_template::node_template_runtime::{
     self, AccountId, Address, BalancesCall, Runtime, RuntimeCall, Signature, SignedExtra,
     SignedPayload, UncheckedExtrinsic, ZkLoginCall,
 };
-use zklogin_support::{
-    test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs},
-    JWKProvider, JwkId, ZkMaterial,
+use primitive_zklogin::{
+    test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs, test_cases::google},
+    JwkProvider, ZkMaterial,
 };
 
 // must replace this genesis to your own
@@ -28,15 +27,15 @@ fn main() {
     let signing_pub = signing_key.public();
     println!("{:?}", signing_pub);
 
+    // let jwks = google::jwks();
+    let kids = google::kids();
     // can be used in test,
-    let google_kid = "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781";
-    let google_jwk_id = JwkId::new(
-        JWKProvider::Google,
-        BoundedVec::<u8, ConstU32<256>>::truncate_from(google_kid.as_bytes().to_vec()),
-    );
+    let google_kid = kids[0].clone();
+    // let google_jwk = jwks[0].clone();
 
     // construct zk proof
-    let zk_material = ZkMaterial::new(google_jwk_id, inputs, expire_at, eph_pubkey);
+    let zk_material =
+        ZkMaterial::new(JwkProvider::Google, google_kid, inputs, expire_at, eph_pubkey);
 
     // construct inner example call, using transfer as example
     // construct Transfer Call

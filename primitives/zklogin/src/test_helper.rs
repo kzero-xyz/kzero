@@ -252,3 +252,42 @@ pub fn get_zklogin_inputs(proof_data: String) -> ZkLoginInputs {
     let input = ZkLoginInputs::from_json(&proof_data).expect("wrong json parse");
     input
 }
+
+pub mod test_cases {
+    use crate::{jwk_from_slice, Jwk, Kid};
+    pub mod google {
+        use super::*;
+        const GOOGLE_JWK_LIST: [&str; 2] = [
+            r#"{
+                "kty": "RSA",
+                "e": "AQAB",
+                "kid": "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781",
+                "n": "tgkwz0K80MycaI2Dz_jHkErJ_IHUPTlx4LR_6wltAHQW_ZwhMzINNH8vbWo8P5F2YLDiIbuslF9y7Q3izsPX3XWQyt6LI8ZT4gmGXQBumYMKx2VtbmTYIysKY8AY7x5UCDO-oaAcBuKQvWc5E31kXm6d6vfaEZjrMc_KT3DsFdN0LcAkB-Q9oYcVl7YEgAN849ROKUs6onf7eukj1PHwDzIBgA9AExJaKen0wITvxQv3H_BRXB7m6hFkLbK5Jo18gl3UxJ7Em29peEwi8Psn7MuI7CwhFNchKhjZM9eaMX27tpDPqR15-I6CA5Zf94rabUGWYph5cFXKWPPr8dskQQ",
+                "alg": "RS256"
+            }"#,
+            r#"{
+                "kty": "RSA",
+                "n": "qwrzl06fwB6OIm62IxNG7NXNIDmgdBrvf09ob2Gsp6ZmAXgU4trHPUYrdBaAlU5aHpchXCf_mVL-U5dzRqeVFQsVqsj4PEIE6E5OPw8EwumP2fzLQSswpkKmJJKFcdncfQ730QBonRUEhKkIbiYdicJl5yTkORd0_BmfdLV98r-sEwEHN4lzTJ15-yw90ob_R6vAH4wPyCSN3Xe5_zV6R4ENL2NlKn2HT9lbV7HhtQongea8wfnthUhdZH38kI4SS5nAaCVNxEAzlvJtUIdCpSgjUgcbah-DwY39l4D800kLxkcF2CGXPSmpF8GPs1aWSsYupY8sTSy9qCFJFPFx8Q",
+                "kid": "48a63bc4767f8550a532dc630cf7eb49ff397e7c",
+                "e": "AQAB",
+                "alg": "RS256"
+            }"#,
+        ];
+
+        pub fn jwks() -> Vec<Jwk> {
+            GOOGLE_JWK_LIST
+                .into_iter()
+                .map(|s| jwk_from_slice(s.as_bytes()).expect("Test case muse be a valid jwk"))
+                .collect()
+        }
+
+        pub fn kids() -> Vec<Kid> {
+            jwks()
+                .into_iter()
+                .map(|jwk| {
+                    jwk.common.key_id.expect("Test case JWK must has kid").as_bytes().to_vec()
+                })
+                .collect()
+        }
+    }
+}

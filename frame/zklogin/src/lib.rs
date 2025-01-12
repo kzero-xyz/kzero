@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+mod jwk;
 #[cfg(test)]
 mod tests;
 
@@ -13,9 +14,10 @@ use sp_runtime::{
 };
 use sp_std::prelude::*;
 
-use primitive_zklogin::{replace_sender::ReplaceSender, ZkMaterial};
+use primitive_zklogin::{replace_sender::ReplaceSender, Jwk, JwkProvider, Kid, ZkMaterial};
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
+const TARGET: &str = "runtime::zklogin";
 
 pub use pallet::*;
 
@@ -68,10 +70,19 @@ pub mod pallet {
         UnknownTransactionCannotLookup,
         UnknownTransactionNoUnsignedValidator,
         UnknownTransactionCustom,
+
+        /// Parse json to Jwk struct error.
+        InvalidJwkJson,
     }
 
     #[pallet::pallet]
     pub struct Pallet<T>(_);
+
+    /// TODO
+    #[pallet::storage]
+    #[pallet::unbounded]
+    pub(crate) type Jwks<T> =
+        StorageDoubleMap<_, Blake2_128Concat, JwkProvider, Blake2_128Concat, Kid, Jwk>;
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
@@ -104,6 +115,19 @@ pub mod pallet {
             Self::deposit_event(Event::ZkLoginExecuted { result: exec_res });
             r
         }
+
+        #[pallet::call_index(255)]
+        #[pallet::weight((0, DispatchClass::Operational))]
+        pub fn set_jwk(
+            origin: OriginFor<T>,
+            provider: JwkProvider,
+            json: Vec<u8>,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+            let jwk = jwk::parse_jwk::<T>(&json)?;
+            Jwks::<T>::insert(provider, json, jwk);
+            Ok(().into())
+        }
     }
 
     #[pallet::validate_unsigned]
@@ -126,6 +150,11 @@ pub mod pallet {
             // verify signature
             match call {
                 Call::submit_zklogin_unsigned { uxt, address_seed, zk_material } => {
+                    let (provider, kid) = zk_material.source();
+                    // We require the provider and kid must exist on chain before submit extrinsic.
+                    let jwk = Jwks::<T>::get(provider, kid)
+                        .ok_or::<TransactionValidityError>(InvalidTransaction::Call.into())?;
+
                     // Only signed extrinsic is allowed
                     if !uxt.is_signed().unwrap_or(false) {
                         return InvalidTransaction::Call.into();
@@ -152,13 +181,12 @@ pub mod pallet {
                         return InvalidTransaction::BadMandatory.into();
                     }
 
-                    unimplemented!("We need to fetch jwt at here.")
-                    // // validate zk proof
-                    // zk_material
-                    //     .verify_zk_login(&address_seed)
-                    //     .map_err(|_| InvalidTransaction::BadProof)?;
-                    //
-                    // xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
+                    // validate zk proof
+                    zk_material
+                        .verify_zk_login(&address_seed, &jwk)
+                        .map_err(|_| InvalidTransaction::BadProof)?;
+
+                    xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
                 }
                 _ => Err(InvalidTransaction::Call.into()),
             }

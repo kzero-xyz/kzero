@@ -9,6 +9,10 @@ use frame_support::{
     BoundedVec,
 };
 use pallet_balances::Call as BalancesCall;
+use primitive_zklogin::{
+    test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs},
+    JwkProvider, Kid, ZkMaterial,
+};
 use scale_codec::{Decode, Encode};
 use sp_core::{ed25519, Pair};
 use sp_runtime::{
@@ -17,10 +21,6 @@ use sp_runtime::{
     traits::{BlakeTwo256, DispatchInfoOf, IdentifyAccount, SignedExtension, Verify},
     transaction_validity::TransactionValidityError,
     BuildStorage, MultiAddress, MultiSignature,
-};
-use zklogin_support::{
-    test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs},
-    JWKProvider, JwkId, ZkMaterial,
 };
 
 /// An index to a block.
@@ -137,8 +137,8 @@ fn validate_unsigned_should_work() {
     let signing_key: ed25519::Pair = get_test_eph_key();
 
     let google_kid = "5aaff47c21d06e266cce395b2145c7c6d4730ea5";
-    let google_jwk_id = JwkId::new(
-        JWKProvider::Google,
+    let google_jwk_id = Kid::new(
+        JwkProvider::Google,
         BoundedVec::<u8, ConstU32<256>>::truncate_from(google_kid.as_bytes().to_vec()),
     );
 
