@@ -257,13 +257,6 @@ pub mod test_cases {
     pub mod google {
         use super::*;
         pub const GOOGLE_JWK_JSON_LIST: [&str; 2] = [
-            // r#"{
-            //     "e": "AQAB",
-            //     "kty": "RSA",
-            //     "alg": "RS256",
-            //     "n": "jPxgqe78Uy8UI0nrbys8zFQnskdLnvY9DFAKbI9Or7sPc7vhyQ-ynHWXrvrv3J3EVqcqwZSTAjiKbSbIhKRF2iXyIP5jmhS6QTUQb7D8smC89yZi6Ii-AzpH6QKvmhU7yJ1u0odMM1UDUS5bH5aL50HxxqqaQGlZ7PFOT0xrauAFW-3ONVc7_tXGMbfYRzeRrXqaONJ1B9LOconUlsBsL0U1TepINyztbwjM3NBlvEuBX0m4ZbCFznGoWmnix3FuUS4gAybOO3WYr6Zd71cKBFPfdpMMfNjWM2pf1-1O1IF8iArGbvngn8Vk5QGH3MkJDA_JgZOu9pI64LSIEKG02w",
-            //     "kid": "5aaff47c21d06e266cce395b2145c7c6d4730ea5"
-            // }"#,
             r#"{
                 "kty": "RSA",
                 "e": "AQAB",
