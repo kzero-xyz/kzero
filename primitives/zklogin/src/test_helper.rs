@@ -257,7 +257,7 @@ pub mod test_cases {
     use crate::{jwk_from_slice, Jwk, Kid};
     pub mod google {
         use super::*;
-        const GOOGLE_JWK_LIST: [&str; 2] = [
+        pub const GOOGLE_JWK_JSON_LIST: [&str; 2] = [
             r#"{
                 "kty": "RSA",
                 "e": "AQAB",
@@ -275,7 +275,7 @@ pub mod test_cases {
         ];
 
         pub fn jwks() -> Vec<Jwk> {
-            GOOGLE_JWK_LIST
+            GOOGLE_JWK_JSON_LIST
                 .into_iter()
                 .map(|s| jwk_from_slice(s.as_bytes()).expect("Test case muse be a valid jwk"))
                 .collect()

@@ -1,17 +1,13 @@
 use crate::{Call as ZkLoginCall, Pallet};
 use frame_executive::Executive;
 use frame_support::{
-    assert_ok, derive_impl,
-    dispatch::RawOrigin,
-    pallet_prelude::{ConstU32, TypeInfo},
-    parameter_types,
+    assert_ok, derive_impl, dispatch::RawOrigin, pallet_prelude::TypeInfo, parameter_types,
     traits::UnfilteredDispatchable,
-    BoundedVec,
 };
 use pallet_balances::Call as BalancesCall;
 use primitive_zklogin::{
-    test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs},
-    JwkProvider, Kid, ZkMaterial,
+    test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs, test_cases::google},
+    JwkProvider, ZkMaterial,
 };
 use scale_codec::{Decode, Encode};
 use sp_core::{ed25519, Pair};
@@ -136,13 +132,12 @@ fn validate_unsigned_should_work() {
 
     let signing_key: ed25519::Pair = get_test_eph_key();
 
-    let google_kid = "5aaff47c21d06e266cce395b2145c7c6d4730ea5";
-    let google_jwk_id = Kid::new(
-        JwkProvider::Google,
-        BoundedVec::<u8, ConstU32<256>>::truncate_from(google_kid.as_bytes().to_vec()),
-    );
+    let provider = JwkProvider::Google;
+    let jwks = google::GOOGLE_JWK_JSON_LIST[0];
+    let kids = google::kids();
+    let kid = kids[0].clone();
 
-    let zk_material = ZkMaterial::new(google_jwk_id, inputs, expire_at, eph_pubkey);
+    let zk_material = ZkMaterial::new(provider, kid, inputs, expire_at, eph_pubkey);
 
     // construct Transfer Call
     let dest = AccountId::from([0u8; 32]);
@@ -175,6 +170,9 @@ fn validate_unsigned_should_work() {
     >::new_unsigned(final_call.clone().into());
 
     new_test_ext().execute_with(|| {
+        // Set jwk from root.
+        assert_ok!(ZkLogin::set_jwk(RawOrigin::Root.into(), provider, jwks.as_bytes().to_vec()));
+
         // the eph key's expiration at 834, make sure current number is smaller.
         System::set_block_number(10);
         assert!(Pallet::<Test>::validate_unsigned(source, &final_call).is_ok());

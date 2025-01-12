@@ -1,23 +1,21 @@
 use crate::{
-    jwk::{JwkProvider, Kid},
-    test_helper::{get_raw_data, get_zklogin_inputs},
-    ZkMaterial,
+    test_helper::{get_raw_data, get_zklogin_inputs, test_cases::google},
+    JwkProvider, ZkMaterial,
 };
-use sp_core::{bounded::BoundedVec, ConstU32};
 
 #[test]
 fn verify_zklogin() {
     let (address_seed, input_data, max_epoch, eph_pubkey_bytes) = get_raw_data();
     let input = get_zklogin_inputs(input_data);
 
-    let google_kid = "5aaff47c21d06e266cce395b2145c7c6d4730ea5";
-    let google_jwk_id = Kid::new(
-        JwkProvider::Google,
-        BoundedVec::<u8, ConstU32<256>>::truncate_from(google_kid.as_bytes().to_vec()),
-    );
+    let kids = google::kids();
+    let jwks = google::jwks();
 
-    let zk_material = ZkMaterial::new(google_jwk_id, input, max_epoch, eph_pubkey_bytes);
-    let zklogin_result = zk_material.verify_zk_login(&address_seed);
+    let kid = kids[0].clone();
+    let jwk = jwks[0].clone();
+
+    let zk_material = ZkMaterial::new(JwkProvider::Google, kid, input, max_epoch, eph_pubkey_bytes);
+    let zklogin_result = zk_material.verify_zk_login(&address_seed, &jwk);
 
     assert!(zklogin_result.is_ok());
 }

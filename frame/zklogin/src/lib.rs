@@ -125,7 +125,8 @@ pub mod pallet {
         ) -> DispatchResultWithPostInfo {
             ensure_root(origin)?;
             let jwk = jwk::parse_jwk::<T>(&json)?;
-            Jwks::<T>::insert(provider, json, jwk);
+            let kid = jwk.common.key_id.as_ref().ok_or(Error::<T>::InvalidJwkJson)?.as_bytes();
+            Jwks::<T>::insert(provider, kid, &jwk);
             Ok(().into())
         }
     }

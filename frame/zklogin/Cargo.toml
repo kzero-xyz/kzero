@@ -30,6 +30,7 @@ primitive-zklogin = { workspace = true, default-features = false }
 [dev-dependencies]
 frame-executive = { workspace = true, features = ["default"] }
 pallet-balances = { workspace = true, features = ["default"] }
+primitive-zklogin = { workspace = true, features = ["default", "testing"] }
 
 [features]
 default = ["std"]
