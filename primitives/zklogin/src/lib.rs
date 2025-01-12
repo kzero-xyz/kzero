@@ -35,7 +35,7 @@ mod pvk;
 pub mod replace_sender;
 #[cfg(feature = "testing")]
 pub mod test_helper;
-#[cfg(test)]
+#[cfg(all(test, feature = "testing"))]
 mod tests;
 mod utils;
 mod zk_input;

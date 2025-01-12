@@ -17,5 +17,5 @@ fn verify_zklogin() {
     let zk_material = ZkMaterial::new(JwkProvider::Google, kid, input, max_epoch, eph_pubkey_bytes);
     let zklogin_result = zk_material.verify_zk_login(&address_seed, &jwk);
 
-    assert!(zklogin_result.is_ok());
+    assert!(zklogin_result.is_ok())
 }
