@@ -2,6 +2,7 @@
 mod jwk;
 #[cfg(test)]
 mod tests;
+mod offchain_worker;
 
 use scale_codec::{Codec, Encode};
 
@@ -26,10 +27,14 @@ pub mod pallet {
     use super::*;
     use frame_support::{dispatch::PostDispatchInfo, pallet_prelude::*};
     use frame_system::pallet_prelude::*;
+    use frame_system::offchain::AppCrypto;
     use sp_core::crypto::AccountId32;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
+        /// The identifier type for an offchain worker.
+        type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+
         type RuntimeEvent: From<Event<Self>>
             + IsType<<Self as frame_system::Config>::RuntimeEvent>
             + TryInto<Event<Self>>;
@@ -85,7 +90,11 @@ pub mod pallet {
         StorageDoubleMap<_, Blake2_128Concat, JwkProvider, Blake2_128Concat, Kid, Jwk>;
 
     #[pallet::hooks]
-    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+        fn offchain_worker(block_number: BlockNumberFor<T>) {
+            offchain_worker::offchain_worker_entrypoint::<T>(block_number);
+        }
+    }
 
     #[pallet::call]
     impl<T: Config> Pallet<T>
@@ -94,7 +103,7 @@ pub mod pallet {
     {
         // TODO: provide a valid weight
         #[pallet::call_index(0)]
-        #[pallet::weight(0)]
+        #[pallet::weight({0})]
         pub fn submit_zklogin_unsigned(
             origin: OriginFor<T>,
             uxt: Box<T::Extrinsic>,
@@ -116,8 +125,21 @@ pub mod pallet {
             r
         }
 
+        /// TODO doc
+        #[pallet::call_index(1)]
+        #[pallet::weight({0})]
+        pub fn submit_jwks_unsiged(origin: OriginFor<T>, jwks: Vec<(JwkProvider, Vec<Jwk>)>) -> DispatchResultWithPostInfo {
+            ensure_none(origin)?;
+            for (provider, jwks) in jwks {
+                if let Err(e) = Self::insert_jwks(provider, jwks) {
+                    // TODO print event and logs.
+                }
+            }
+            Ok(().into())
+        }
+
         #[pallet::call_index(255)]
-        #[pallet::weight((0, DispatchClass::Operational))]
+        #[pallet::weight(({0}, DispatchClass::Operational))]
         pub fn set_jwk(
             origin: OriginFor<T>,
             provider: JwkProvider,
@@ -125,9 +147,21 @@ pub mod pallet {
         ) -> DispatchResultWithPostInfo {
             ensure_root(origin)?;
             let jwk = jwk::parse_jwk::<T>(&json)?;
-            let kid = jwk.common.key_id.as_ref().ok_or(Error::<T>::InvalidJwkJson)?.as_bytes();
-            Jwks::<T>::insert(provider, kid, &jwk);
+            Self::insert_jwks(provider, vec![jwk])?;
             Ok(().into())
+        }
+    }
+
+    // Helper functions
+    impl<T: Config> Pallet<T> {
+        fn insert_jwks(provider: JwkProvider, jwks: Vec<Jwk>) -> Result<(), Error<T>>{
+            // TODO delete old jwks first, then insert new
+            for jwk in jwks {
+                let kid = jwk.common.key_id.as_ref().ok_or(Error::<T>::InvalidJwkJson)?.as_bytes();
+                Jwks::<T>::insert(provider, kid, &jwk);
+                // TODO print event
+            }
+            Ok(())
         }
     }
 
