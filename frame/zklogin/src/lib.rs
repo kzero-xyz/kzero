@@ -259,10 +259,10 @@ pub mod pallet {
                     if !signature_valid {
                         return InvalidTransaction::BadProof.into()
                     }
-                    // TODO validate payload, while may impossible
+                    // TODO validate payload, at least need to verify the public.
 
                     ValidTransaction::with_tag_prefix("ZkLoginOffchainWorker")
-                        // TODO add more paramters to this unsiged extrinisc
+                        // TODO add more parameters to this unsigned extrinsic
                         //.priority()
                         //.and_requires()
                         //.and_provides(next_unsigned_at)

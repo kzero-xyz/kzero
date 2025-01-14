@@ -14,7 +14,7 @@ use sp_runtime::{
 };
 use sp_std::vec::Vec;
 
-use crate::{Call, Config};
+use crate::{Call, Config, Jwks};
 
 const TARGET: &str = "offchain-worker::zklogin";
 
@@ -63,16 +63,48 @@ where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
 {
     log::debug!(target: TARGET, "Offchain worker for zklogin. number: {:?}", block_number);
+    // TODO for now, anybody can submit this transaction, we need a group to limit.
 
-    let mut prepared_jwks = Vec::new();
-    for (provider, jwks) in fetch_jwks() {
-        // TODO compare with the onchain state before
-        // TODO check whether the jwk is valid.
-        prepared_jwks.push((provider, jwks));
+    let all_jwks = fetch_jwks();
+    let prepared_jwks = all_jwks.into_iter().filter_map(|(provider, jwks)| {
+        let candidate_jwks = jwks.into_iter().filter_map(|jwk| {
+            // TODO check whether the jwk is valid.
+            match jwk.common.key_id {
+                None => {
+                    // TODO print error logs
+                    None
+                }
+                Some(ref key_id) => {
+                    if Jwks::<T>::contains_key(provider, key_id.as_bytes()) {
+                        // TODO maybe also compare the jwk content.
+                        // TODO print debug log
+                        None
+                    }else {
+                        Some(jwk)
+                    }
+                }
+            }
+        }).collect::<Vec<_>>();
+        if candidate_jwks.is_empty() {
+            // TODO print debug log for this provider
+            None
+        } else {
+            // TODO print info log for this provider.
+            log::info!(target: TARGET, "Provider {:?} can update the jwks, count: {}", provider, candidate_jwks.len());
+            Some((provider, candidate_jwks))
+        }
+    }).collect::<Vec<_>>();
+
+    if prepared_jwks.is_empty() {
+        log::info!(target: TARGET, "All jwks has not updated yet. Ignore to submit extrinsic.");
+        return
     }
 
     match submit_unsigned::<T>(block_number, prepared_jwks) {
-        Ok(()) => {}
+        Ok(()) => {
+            // TODO may print jwks content.
+            log::info!(target: TARGET, "ZkLogin Offchain worker submit unsigned extrinsic to update jwks.");
+        }
         Err(err) => {
             log::error!(target:TARGET, "Offchain worker submit unsigned extrinsic err: {:}", err)
         }
