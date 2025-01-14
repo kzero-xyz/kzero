@@ -1,8 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 mod jwk;
+mod offchain_worker;
 #[cfg(test)]
 mod tests;
-mod offchain_worker;
 
 use scale_codec::{Codec, Encode};
 
@@ -11,11 +11,17 @@ use frame_support::dispatch::{
 };
 use sp_runtime::{
     traits::{Applyable, BlockNumberProvider, Checkable, Dispatchable, Extrinsic, StaticLookup},
-    transaction_validity::{InvalidTransaction, TransactionValidityError, UnknownTransaction},
+    transaction_validity::{
+        InvalidTransaction, TransactionValidityError, UnknownTransaction, ValidTransaction,
+    },
 };
 use sp_std::prelude::*;
 
 use primitive_zklogin::{replace_sender::ReplaceSender, Jwk, JwkProvider, Kid, ZkMaterial};
+
+use crate::offchain_worker::JwksPayload;
+// re-export
+pub use crate::offchain_worker::crypto;
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 const TARGET: &str = "runtime::zklogin";
@@ -26,12 +32,20 @@ pub use pallet::*;
 pub mod pallet {
     use super::*;
     use frame_support::{dispatch::PostDispatchInfo, pallet_prelude::*};
-    use frame_system::pallet_prelude::*;
-    use frame_system::offchain::AppCrypto;
+    use frame_system::{
+        offchain::{AppCrypto, SignedPayload},
+        pallet_prelude::*,
+    };
     use sp_core::crypto::AccountId32;
 
     #[pallet::config]
-    pub trait Config: frame_system::Config {
+    pub trait Config:
+        frame_system::offchain::SendTransactionTypes<Call<Self>>
+        + frame_system::offchain::SigningTypes
+        + frame_system::Config
+    where
+        Self::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    {
         /// The identifier type for an offchain worker.
         type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
 
@@ -60,12 +74,18 @@ pub mod pallet {
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
-    pub enum Event<T: Config> {
+    pub enum Event<T: Config>
+    where
+        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    {
         ZkLoginExecuted { result: DispatchResult },
     }
 
     #[pallet::error]
-    pub enum Error<T> {
+    pub enum Error<T>
+// where
+    //     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    {
         /// Ephemeral key is is expired.
         EphKeyExpired,
         /// Converted from Error `InvalidTransaction`
@@ -90,7 +110,10 @@ pub mod pallet {
         StorageDoubleMap<_, Blake2_128Concat, JwkProvider, Blake2_128Concat, Kid, Jwk>;
 
     #[pallet::hooks]
-    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
+    where
+        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    {
         fn offchain_worker(block_number: BlockNumberFor<T>) {
             offchain_worker::offchain_worker_entrypoint::<T>(block_number);
         }
@@ -106,7 +129,7 @@ pub mod pallet {
         #[pallet::weight({0})]
         pub fn submit_zklogin_unsigned(
             origin: OriginFor<T>,
-            uxt: Box<T::Extrinsic>,
+            uxt: Box<<T as Config>::Extrinsic>,
             address_seed: AccountIdLookupOf<T>,
             zk_material: ZkMaterial,
         ) -> DispatchResultWithPostInfo {
@@ -128,10 +151,14 @@ pub mod pallet {
         /// TODO doc
         #[pallet::call_index(1)]
         #[pallet::weight({0})]
-        pub fn submit_jwks_unsiged(origin: OriginFor<T>, jwks: Vec<(JwkProvider, Vec<Jwk>)>) -> DispatchResultWithPostInfo {
+        pub fn submit_jwks_unsigned(
+            origin: OriginFor<T>,
+            payload: JwksPayload<T::Public, BlockNumberFor<T>>,
+            _signature: T::Signature,
+        ) -> DispatchResultWithPostInfo {
             ensure_none(origin)?;
-            for (provider, jwks) in jwks {
-                if let Err(e) = Self::insert_jwks(provider, jwks) {
+            for (provider, jwks) in payload.jwks {
+                if let Err(_e) = Self::insert_jwks(provider, jwks) {
                     // TODO print event and logs.
                 }
             }
@@ -153,8 +180,11 @@ pub mod pallet {
     }
 
     // Helper functions
-    impl<T: Config> Pallet<T> {
-        fn insert_jwks(provider: JwkProvider, jwks: Vec<Jwk>) -> Result<(), Error<T>>{
+    impl<T: Config> Pallet<T>
+    where
+        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    {
+        fn insert_jwks(provider: JwkProvider, jwks: Vec<Jwk>) -> Result<(), Error<T>> {
             // TODO delete old jwks first, then insert new
             for jwk in jwks {
                 let kid = jwk.common.key_id.as_ref().ok_or(Error::<T>::InvalidJwkJson)?.as_bytes();
@@ -223,6 +253,23 @@ pub mod pallet {
 
                     xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
                 }
+                Call::submit_jwks_unsigned { ref payload, ref signature } => {
+                    let signature_valid =
+                        SignedPayload::<T>::verify::<T::AuthorityId>(payload, signature.clone());
+                    if !signature_valid {
+                        return InvalidTransaction::BadProof.into()
+                    }
+                    // TODO validate payload, while may impossible
+
+                    ValidTransaction::with_tag_prefix("ZkLoginOffchainWorker")
+                        // TODO add more paramters to this unsiged extrinisc
+                        //.priority()
+                        //.and_requires()
+                        //.and_provides(next_unsigned_at)
+                        .longevity(5)
+                        .propagate(true)
+                        .build()
+                }
                 _ => Err(InvalidTransaction::Call.into()),
             }
         }
@@ -237,7 +284,7 @@ where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
 {
     fn apply_extrinsic(
-        uxt: Box<T::Extrinsic>,
+        uxt: Box<<T as Config>::Extrinsic>,
         address_seed: AccountIdLookupOf<T>,
     ) -> DispatchResultWithPostInfo {
         let encoded = uxt.encode();
@@ -261,7 +308,10 @@ where
     }
 }
 
-impl<T: Config> From<TransactionValidityError> for Error<T> {
+impl<T: Config> From<TransactionValidityError> for Error<T>
+where
+    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+{
     fn from(value: TransactionValidityError) -> Self {
         match value {
             TransactionValidityError::Invalid(_) => Error::InvalidTransaction,

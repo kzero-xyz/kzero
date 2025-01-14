@@ -97,10 +97,13 @@ impl JwkProvider {
 
     pub fn iterator() -> impl Iterator<Item = Self> {
         use JwkProvider::*;
-        [ Google,Twitch,Facebook,Kakao,Apple,Slack,].iter().copied()
+        [Google, Twitch, Facebook, Kakao, Apple, Slack].iter().copied()
     }
 
-    pub fn fetch_jwks<E>(&self, fetcher: impl Fn(&str) -> Result<serde_json::Value, E>) -> Result<Vec<Jwk>, JwkProviderErr<E>> {
+    pub fn fetch_jwks<E>(
+        &self,
+        fetcher: impl Fn(&str) -> Result<serde_json::Value, E>,
+    ) -> Result<Vec<Jwk>, JwkProviderErr<E>> {
         use serde_json::Value;
         let well_know_link = self.well_know_link();
         let obj = fetcher(well_know_link).map_err(JwkProviderErr::Fetch)?;
@@ -112,13 +115,14 @@ impl JwkProvider {
                 //    // other fields
                 //    "jwks_uri": "https://...",
                 // }
-                let value = map.get(Self::COMMON_JWKS_URI_KEY).ok_or(JwkProviderErr::NotFoundJwkUri)?;
+                let value =
+                    map.get(Self::COMMON_JWKS_URI_KEY).ok_or(JwkProviderErr::NotFoundJwkUri)?;
                 match value {
                     Value::String(link) => link.as_str(),
                     _ => return Err(JwkProviderErr::InvalidJson(obj)),
                 }
             }
-            _ => return Err(JwkProviderErr::InvalidJson(obj))
+            _ => return Err(JwkProviderErr::InvalidJson(obj)),
         };
 
         let obj = fetcher(link).map_err(JwkProviderErr::Fetch)?;
@@ -132,16 +136,18 @@ impl JwkProvider {
                 //        },
                 //    ],
                 // }
-                let value = map.get_mut(Self::COMMON_JWKS_KEY).ok_or(JwkProviderErr::NotFoundJwks)?;
+                let value =
+                    map.get_mut(Self::COMMON_JWKS_KEY).ok_or(JwkProviderErr::NotFoundJwks)?;
                 if !value.is_array() {
                     return Err(JwkProviderErr::InvalidJson(value.clone()))
                 }
 
                 let jwks = value.take();
-                let r = serde_json::from_value::<Vec<Jwk>>(jwks).map_err(JwkProviderErr::InvalidJwks)?;
+                let r = serde_json::from_value::<Vec<Jwk>>(jwks)
+                    .map_err(JwkProviderErr::InvalidJwks)?;
                 Ok(r)
             }
-            _ => Err(JwkProviderErr::InvalidJson(obj))
+            _ => Err(JwkProviderErr::InvalidJson(obj)),
         }
     }
 }
