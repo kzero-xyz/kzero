@@ -16,7 +16,6 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{crypto::AccountId32, U256};
-use sp_runtime::RuntimeDebug;
 use sp_std::vec::Vec;
 
 pub use error::{ZkAuthError, ZkAuthResult};
@@ -54,7 +53,7 @@ pub fn jwk_from_slice(json: &[u8]) -> serde_json::Result<Jwk> {
 #[derive(
     Encode,
     Decode,
-    RuntimeDebug,
+    Debug,
     MaxEncodedLen,
     TypeInfo,
     Clone,
@@ -79,6 +78,88 @@ pub enum JwkProvider {
     Slack,
 }
 
+impl JwkProvider {
+    const COMMON_JWKS_URI_KEY: &'static str = "jwks_uri";
+    const COMMON_JWKS_KEY: &'static str = "keys";
+
+    pub fn well_know_link(&self) -> &'static str {
+        // TODO choose to query storage first, then use this default.
+        match self {
+            JwkProvider::Google => "https://accounts.google.com/.well-known/openid-configuration",
+            JwkProvider::Twitch => "https://id.twitch.tv/oauth2/.well-known/openid-configuration",
+            JwkProvider::Facebook => "https://www.facebook.com/.well-known/openid-configuration/",
+            JwkProvider::Kakao => "https://kauth.kakao.com/.well-known/openid-configuration",
+            JwkProvider::Apple => "https://appleid.apple.com/.well-known/openid-configuration",
+            JwkProvider::Slack => "https://slack.com/.well-known/openid-configuration",
+        }
+    }
+
+    pub fn iterator() -> impl Iterator<Item = Self> {
+        use JwkProvider::*;
+        [Google, Twitch, Facebook, Kakao, Apple, Slack].iter().copied()
+    }
+
+    pub fn fetch_jwks<E>(
+        &self,
+        fetcher: impl Fn(&str) -> Result<serde_json::Value, E>,
+    ) -> Result<Vec<Jwk>, JwkProviderErr<E>> {
+        use serde_json::Value;
+        let well_know_link = self.well_know_link();
+        let obj = fetcher(well_know_link).map_err(JwkProviderErr::Fetch)?;
+        let link = match &obj {
+            Value::Object(map) => {
+                // For now, The structure returned by all current providers meets the following form:
+                // ```json
+                // {
+                //    // other fields
+                //    "jwks_uri": "https://...",
+                // }
+                let value =
+                    map.get(Self::COMMON_JWKS_URI_KEY).ok_or(JwkProviderErr::NotFoundJwkUri)?;
+                match value {
+                    Value::String(link) => link.as_str(),
+                    _ => return Err(JwkProviderErr::InvalidJson(obj)),
+                }
+            }
+            _ => return Err(JwkProviderErr::InvalidJson(obj)),
+        };
+
+        let obj = fetcher(link).map_err(JwkProviderErr::Fetch)?;
+        match obj {
+            Value::Object(mut map) => {
+                // For now, The structure returned by all current `jwks_uri` meets the following form:
+                // ```json
+                // {
+                //    "keys": [
+                //        { // jwks json
+                //        },
+                //    ],
+                // }
+                let value =
+                    map.get_mut(Self::COMMON_JWKS_KEY).ok_or(JwkProviderErr::NotFoundJwks)?;
+                if !value.is_array() {
+                    return Err(JwkProviderErr::InvalidJson(value.clone()))
+                }
+
+                let jwks = value.take();
+                let r = serde_json::from_value::<Vec<Jwk>>(jwks)
+                    .map_err(JwkProviderErr::InvalidJwks)?;
+                Ok(r)
+            }
+            _ => Err(JwkProviderErr::InvalidJson(obj)),
+        }
+    }
+}
+
+// TODO add doc and derive for this error.
+pub enum JwkProviderErr<Err> {
+    Fetch(Err),
+    NotFoundJwkUri,
+    NotFoundJwks,
+    InvalidJson(serde_json::Value),
+    InvalidJwks(serde_json::Error),
+}
+
 /// Kid is a String in spec, we use `Bytes` to present it.
 /// For now, the max length for Kid is 43, which comes from Slack.
 pub type Kid = Vec<u8>;
@@ -99,7 +180,7 @@ impl Default for ZkLoginEnv {
 }
 
 /// The material that is used for zkproof verification
-#[derive(Encode, Decode, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
+#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq, Eq)]
 pub struct ZkMaterial {
     // source: (JwkProvider, Kid),
     /// (JwkProvider,kid) that is used to get the corresponding `n`, which

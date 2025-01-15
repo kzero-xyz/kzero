@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 mod jwk;
+mod offchain_worker;
 #[cfg(test)]
 mod tests;
 
@@ -10,11 +11,17 @@ use frame_support::dispatch::{
 };
 use sp_runtime::{
     traits::{Applyable, BlockNumberProvider, Checkable, Dispatchable, Extrinsic, StaticLookup},
-    transaction_validity::{InvalidTransaction, TransactionValidityError, UnknownTransaction},
+    transaction_validity::{
+        InvalidTransaction, TransactionValidityError, UnknownTransaction, ValidTransaction,
+    },
 };
 use sp_std::prelude::*;
 
 use primitive_zklogin::{replace_sender::ReplaceSender, Jwk, JwkProvider, Kid, ZkMaterial};
+
+use crate::offchain_worker::JwksPayload;
+// re-export
+pub use crate::offchain_worker::crypto;
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 const TARGET: &str = "runtime::zklogin";
@@ -25,11 +32,23 @@ pub use pallet::*;
 pub mod pallet {
     use super::*;
     use frame_support::{dispatch::PostDispatchInfo, pallet_prelude::*};
-    use frame_system::pallet_prelude::*;
+    use frame_system::{
+        offchain::{AppCrypto, SignedPayload},
+        pallet_prelude::*,
+    };
     use sp_core::crypto::AccountId32;
 
     #[pallet::config]
-    pub trait Config: frame_system::Config {
+    pub trait Config:
+        frame_system::offchain::SendTransactionTypes<Call<Self>>
+        + frame_system::offchain::SigningTypes
+        + frame_system::Config
+    where
+        Self::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    {
+        /// The identifier type for an offchain worker.
+        type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+
         type RuntimeEvent: From<Event<Self>>
             + IsType<<Self as frame_system::Config>::RuntimeEvent>
             + TryInto<Event<Self>>;
@@ -55,7 +74,10 @@ pub mod pallet {
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
-    pub enum Event<T: Config> {
+    pub enum Event<T: Config>
+    where
+        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    {
         ZkLoginExecuted { result: DispatchResult },
     }
 
@@ -85,7 +107,14 @@ pub mod pallet {
         StorageDoubleMap<_, Blake2_128Concat, JwkProvider, Blake2_128Concat, Kid, Jwk>;
 
     #[pallet::hooks]
-    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
+    where
+        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    {
+        fn offchain_worker(block_number: BlockNumberFor<T>) {
+            offchain_worker::offchain_worker_entrypoint::<T>(block_number);
+        }
+    }
 
     #[pallet::call]
     impl<T: Config> Pallet<T>
@@ -94,10 +123,10 @@ pub mod pallet {
     {
         // TODO: provide a valid weight
         #[pallet::call_index(0)]
-        #[pallet::weight(0)]
+        #[pallet::weight({0})]
         pub fn submit_zklogin_unsigned(
             origin: OriginFor<T>,
-            uxt: Box<T::Extrinsic>,
+            uxt: Box<<T as Config>::Extrinsic>,
             address_seed: AccountIdLookupOf<T>,
             zk_material: ZkMaterial,
         ) -> DispatchResultWithPostInfo {
@@ -116,8 +145,25 @@ pub mod pallet {
             r
         }
 
+        /// TODO doc
+        #[pallet::call_index(1)]
+        #[pallet::weight({0})]
+        pub fn submit_jwks_unsigned(
+            origin: OriginFor<T>,
+            payload: JwksPayload<T::Public, BlockNumberFor<T>>,
+            _signature: T::Signature,
+        ) -> DispatchResultWithPostInfo {
+            ensure_none(origin)?;
+            for (provider, jwks) in payload.jwks {
+                if let Err(_e) = Self::insert_jwks(provider, jwks) {
+                    // TODO print event and logs.
+                }
+            }
+            Ok(().into())
+        }
+
         #[pallet::call_index(255)]
-        #[pallet::weight((0, DispatchClass::Operational))]
+        #[pallet::weight(({0}, DispatchClass::Operational))]
         pub fn set_jwk(
             origin: OriginFor<T>,
             provider: JwkProvider,
@@ -125,9 +171,24 @@ pub mod pallet {
         ) -> DispatchResultWithPostInfo {
             ensure_root(origin)?;
             let jwk = jwk::parse_jwk::<T>(&json)?;
-            let kid = jwk.common.key_id.as_ref().ok_or(Error::<T>::InvalidJwkJson)?.as_bytes();
-            Jwks::<T>::insert(provider, kid, &jwk);
+            Self::insert_jwks(provider, vec![jwk])?;
             Ok(().into())
+        }
+    }
+
+    // Helper functions
+    impl<T: Config> Pallet<T>
+    where
+        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    {
+        fn insert_jwks(provider: JwkProvider, jwks: Vec<Jwk>) -> Result<(), Error<T>> {
+            // TODO delete old jwks first, then insert new
+            for jwk in jwks {
+                let kid = jwk.common.key_id.as_ref().ok_or(Error::<T>::InvalidJwkJson)?.as_bytes();
+                Jwks::<T>::insert(provider, kid, &jwk);
+                // TODO print event
+            }
+            Ok(())
         }
     }
 
@@ -140,13 +201,13 @@ pub mod pallet {
         type Call = Call<T>;
 
         fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-            // TODO no need?
+            // TODO no need? `submit_jwks_unsigned` needs `Local` while `submit_zklogin_unsigned` needs `InBlock` & `External`, while in future `submit_jwks_unsigned` may also need `Local`.
             // validate the transaction that is submitted from external (not local)
             // or included in transaction pool
-            match source {
-                TransactionSource::InBlock | TransactionSource::External => { /* allowed */ }
-                _ => return InvalidTransaction::Call.into(),
-            };
+            // match source {
+            //     TransactionSource::InBlock | TransactionSource::External => { /* allowed */ }
+            //     _ => return InvalidTransaction::Call.into(),
+            // };
 
             // verify signature
             match call {
@@ -189,6 +250,23 @@ pub mod pallet {
 
                     xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
                 }
+                Call::submit_jwks_unsigned { payload, signature } => {
+                    let signature_valid =
+                        SignedPayload::<T>::verify::<T::AuthorityId>(payload, signature.clone());
+                    if !signature_valid {
+                        return InvalidTransaction::BadProof.into()
+                    }
+                    // TODO validate payload, at least need to verify the public.
+
+                    ValidTransaction::with_tag_prefix("ZkLoginOffchainWorker")
+                        // TODO add more parameters to this unsigned extrinsic
+                        //.priority()
+                        //.and_requires()
+                        //.and_provides(next_unsigned_at)
+                        .longevity(5)
+                        .propagate(true)
+                        .build()
+                }
                 _ => Err(InvalidTransaction::Call.into()),
             }
         }
@@ -203,7 +281,7 @@ where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
 {
     fn apply_extrinsic(
-        uxt: Box<T::Extrinsic>,
+        uxt: Box<<T as Config>::Extrinsic>,
         address_seed: AccountIdLookupOf<T>,
     ) -> DispatchResultWithPostInfo {
         let encoded = uxt.encode();
@@ -227,7 +305,10 @@ where
     }
 }
 
-impl<T: Config> From<TransactionValidityError> for Error<T> {
+impl<T: Config> From<TransactionValidityError> for Error<T>
+where
+    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+{
     fn from(value: TransactionValidityError) -> Self {
         match value {
             TransactionValidityError::Invalid(_) => Error::InvalidTransaction,
