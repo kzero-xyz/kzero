@@ -82,10 +82,7 @@ pub mod pallet {
     }
 
     #[pallet::error]
-    pub enum Error<T>
-// where
-    //     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-    {
+    pub enum Error<T> {
         /// Ephemeral key is is expired.
         EphKeyExpired,
         /// Converted from Error `InvalidTransaction`
