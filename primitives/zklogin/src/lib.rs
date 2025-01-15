@@ -16,7 +16,6 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{crypto::AccountId32, U256};
-use sp_runtime::RuntimeDebug;
 use sp_std::vec::Vec;
 
 pub use error::{ZkAuthError, ZkAuthResult};
@@ -54,7 +53,7 @@ pub fn jwk_from_slice(json: &[u8]) -> serde_json::Result<Jwk> {
 #[derive(
     Encode,
     Decode,
-    RuntimeDebug,
+    Debug,
     MaxEncodedLen,
     TypeInfo,
     Clone,
@@ -181,7 +180,7 @@ impl Default for ZkLoginEnv {
 }
 
 /// The material that is used for zkproof verification
-#[derive(Encode, Decode, TypeInfo, RuntimeDebug, Clone, PartialEq, Eq)]
+#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq, Eq)]
 pub struct ZkMaterial {
     // source: (JwkProvider, Kid),
     /// (JwkProvider,kid) that is used to get the corresponding `n`, which

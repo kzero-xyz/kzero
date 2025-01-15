@@ -204,13 +204,13 @@ pub mod pallet {
         type Call = Call<T>;
 
         fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-            // TODO no need?
+            // TODO no need? `submit_jwks_unsigned` needs `Local` while `submit_zklogin_unsigned` needs `InBlock` & `External`, while in future `submit_jwks_unsigned` may also need `Local`.
             // validate the transaction that is submitted from external (not local)
             // or included in transaction pool
-            match source {
-                TransactionSource::InBlock | TransactionSource::External => { /* allowed */ }
-                _ => return InvalidTransaction::Call.into(),
-            };
+            // match source {
+            //     TransactionSource::InBlock | TransactionSource::External => { /* allowed */ }
+            //     _ => return InvalidTransaction::Call.into(),
+            // };
 
             // verify signature
             match call {
@@ -253,7 +253,7 @@ pub mod pallet {
 
                     xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
                 }
-                Call::submit_jwks_unsigned { ref payload, ref signature } => {
+                Call::submit_jwks_unsigned { payload, signature } => {
                     let signature_valid =
                         SignedPayload::<T>::verify::<T::AuthorityId>(payload, signature.clone());
                     if !signature_valid {

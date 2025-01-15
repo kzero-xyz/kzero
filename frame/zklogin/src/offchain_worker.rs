@@ -1,51 +1,50 @@
-use frame_support::dispatch::{DispatchInfo, PostDispatchInfo};
 use scale_codec::{Decode, Encode};
-
+// Substrate
+use frame_support::dispatch::{DispatchInfo, PostDispatchInfo};
 use frame_system::{
-    offchain::{SendUnsignedTransaction, SignedPayload, Signer, SigningTypes},
+    offchain::{AppCrypto, SendUnsignedTransaction, SignedPayload, Signer, SigningTypes},
     pallet_prelude::BlockNumberFor,
 };
-use primitive_zklogin::{Jwk, JwkProvider, JwkProviderErr};
-use sp_core::crypto::KeyTypeId;
 use sp_runtime::{
     offchain::{http, Duration},
     traits::Dispatchable,
-    RuntimeDebug,
+    RuntimeAppPublic,
 };
 use sp_std::vec::Vec;
-
+// zklogin and local
 use crate::{Call, Config, Jwks};
+use primitive_zklogin::{Jwk, JwkProvider, JwkProviderErr};
 
 const TARGET: &str = "offchain-worker::zklogin";
-
-/// Defines application identifier for crypto keys of this module.
-///
-/// Every module that deals with signatures needs to declare its unique identifier for
-/// its crypto keys.
-/// When offchain worker is signing transactions it's going to request keys of type
-/// `KeyTypeId` from the keystore and use the ones it finds to sign the transaction.
-/// The keys can be inserted manually via RPC (see `author_insertKey`).
-pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"zklo");
 
 /// Based on the above `KeyTypeId` we need to generate a pallet-specific crypto type wrappers.
 /// We can use from supported crypto kinds (`sr25519`, `ed25519` and `ecdsa`) and augment
 /// the types with this pallet-specific identifier.
 pub mod crypto {
-    use super::KEY_TYPE;
-    use sp_core::sr25519::Signature as Sr25519Signature;
+    use sp_core::{crypto::KeyTypeId, sr25519::Signature as Sr25519Signature};
     use sp_runtime::{
         app_crypto::{app_crypto, sr25519},
         traits::Verify,
         MultiSignature, MultiSigner,
     };
+
+    /// Defines application identifier for crypto keys of this module.
+    ///
+    /// Every module that deals with signatures needs to declare its unique identifier for
+    /// its crypto keys.
+    /// When offchain worker is signing transactions it's going to request keys of type
+    /// `KeyTypeId` from the keystore and use the ones it finds to sign the transaction.
+    /// The keys can be inserted manually via RPC (see `author_insertKey`).
+    pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"zklo");
+
     app_crypto!(sr25519, KEY_TYPE);
 
     pub struct ZkLoginAuthId;
 
     impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for ZkLoginAuthId {
         type RuntimeAppPublic = Public;
-        type GenericPublic = sp_core::sr25519::Public;
-        type GenericSignature = sp_core::sr25519::Signature;
+        type GenericPublic = sr25519::Public;
+        type GenericSignature = sr25519::Signature;
     }
 
     // implemented for mock runtime in test
@@ -53,17 +52,34 @@ pub mod crypto {
         for ZkLoginAuthId
     {
         type RuntimeAppPublic = Public;
-        type GenericPublic = sp_core::sr25519::Public;
-        type GenericSignature = sp_core::sr25519::Signature;
+        type GenericPublic = sr25519::Public;
+        type GenericSignature = sr25519::Signature;
     }
+}
+
+type RuntimeAppPublicOf<T> = <<T as Config>::AuthorityId as AppCrypto<
+    <T as SigningTypes>::Public,
+    <T as SigningTypes>::Signature,
+>>::RuntimeAppPublic;
+
+fn readable_key_type<T: Config>(id: &sp_core::crypto::KeyTypeId) -> &str
+where
+    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+{
+    sp_std::str::from_utf8(id.0.as_slice()).unwrap_or("<invalid>")
 }
 
 pub fn offchain_worker_entrypoint<T: Config>(block_number: BlockNumberFor<T>)
 where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
 {
-    log::debug!(target: TARGET, "Offchain worker for zklogin. number: {:?}", block_number);
+    log::debug!(target: TARGET, "ZkLogin offchain worker. number: {:?}", block_number);
     // TODO for now, anybody can submit this transaction, we need a group to limit.
+
+    if !Signer::<T, T::AuthorityId>::any_account().can_sign() {
+        log::debug!(target: TARGET, "This node does not have the key for KeyType: [{}], exit ZkLogin offchain worker", readable_key_type::<T>(&RuntimeAppPublicOf::<T>::ID));
+        return
+    }
 
     let all_jwks = fetch_jwks();
     let prepared_jwks = all_jwks.into_iter().filter_map(|(provider, jwks)| {
@@ -90,7 +106,7 @@ where
             None
         } else {
             // TODO print info log for this provider.
-            log::info!(target: TARGET, "Provider {:?} can update the jwks, count: {}", provider, candidate_jwks.len());
+            log::info!(target: TARGET, "Provider [{:?}] can update the jwks, count: [{}]", provider, candidate_jwks.len());
             Some((provider, candidate_jwks))
         }
     }).collect::<Vec<_>>();
@@ -113,7 +129,7 @@ where
 
 /// Payload used by this example crate to hold price
 /// data required to submit a transaction.
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, scale_info::TypeInfo)]
 pub struct JwksPayload<Public, BlockNumber> {
     pub jwks: Vec<(JwkProvider, Vec<Jwk>)>,
     pub block_number: BlockNumber,
@@ -136,10 +152,13 @@ where
     // -- Sign using any account
     let (_, result) = Signer::<T, T::AuthorityId>::any_account()
         .send_unsigned_transaction(
-            |account| JwksPayload {
-                jwks: jwks.clone(),
-                block_number,
-                public: account.public.clone(),
+            |account| {
+                log::info!(target: TARGET, "Using KeyType: [{}] account: [id: {:?}|public: {:?}|index: {}] to sign payload and submit unsigned.", readable_key_type::<T>(&RuntimeAppPublicOf::<T>::ID), account.id, account.public, account.index);
+                JwksPayload {
+                    jwks: jwks.clone(),
+                    block_number,
+                    public: account.public.clone(),
+                }
             },
             |payload, signature| Call::submit_jwks_unsigned { payload, signature },
         )
