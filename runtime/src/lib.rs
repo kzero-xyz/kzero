@@ -275,7 +275,7 @@ impl pallet_zklogin::Config for Runtime {
 
     type Context = frame_system::ChainContext<Runtime>;
 
-    type BlockNumberProvider = System;
+    type Time = Timestamp;
 }
 
 // Create the zksig by composing the FRAME pallets that were previously configured.

@@ -35,7 +35,7 @@ impl ZkLoginInputs {
         // TODO; change this to [u8; 32]
         eph_pk_bytes: &PubKey,
         modulus: &[u8],
-        max_epoch: u32,
+        max_epoch: u64,
     ) -> Result<Bn254Fr, ZkAuthError> {
         let (first, second) = split_to_two_frs(eph_pk_bytes)?;
         let address_seed =

@@ -192,7 +192,7 @@ pub fn get_test_eph_key() -> Ed25519Pair {
     Pair::from_seed(&pri_key)
 }
 
-pub fn get_raw_data() -> (AccountId32, String, u32, [u8; 32]) {
+pub fn get_raw_data() -> (AccountId32, String, u64, [u8; 32]) {
     let user_salt = "6903439401297002981078976741241818963710729444388942281949823152082404716376301797176193848";
 
     let address_seed = gen_address_seed(
@@ -241,7 +241,7 @@ pub fn get_raw_data() -> (AccountId32, String, u32, [u8; 32]) {
         "header": "913143068733459984664279033783989157259274322902058410967852973431920544493"
     }"#;
 
-    let max_epoch: u32 = 834;
+    let max_epoch: u64 = 834;
     let eph_pubkey_bytes: [u8; 32] = get_test_eph_key().public().0;
 
     (address_seed, proof_data.to_owned(), max_epoch, eph_pubkey_bytes)
