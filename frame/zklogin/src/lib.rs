@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+
 mod jwk;
 mod offchain_worker;
 #[cfg(test)]
@@ -6,8 +7,11 @@ mod tests;
 
 use scale_codec::{Codec, Encode};
 
-use frame_support::dispatch::{
-    DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo, PostDispatchInfo,
+use frame_support::{
+    dispatch::{
+        DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo, PostDispatchInfo,
+    },
+    traits::Time,
 };
 use sp_runtime::{
     traits::{Applyable, BlockNumberProvider, Checkable, Dispatchable, Extrinsic, StaticLookup},
@@ -24,9 +28,12 @@ use crate::offchain_worker::JwksPayload;
 pub use crate::offchain_worker::crypto;
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
+
 const TARGET: &str = "runtime::zklogin";
 
 pub use pallet::*;
+
+pub type MomentOf<T> = <<T as Config>::Time as Time>::Moment;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -69,7 +76,7 @@ pub mod pallet {
         /// Same as `Executive`
         type UnsignedValidator: ValidateUnsigned<Call = Self::RuntimeCall>;
 
-        type BlockNumberProvider: BlockNumberProvider<BlockNumber = BlockNumberFor<Self>>;
+        type Time: Time;
     }
 
     #[pallet::event]
@@ -128,14 +135,14 @@ pub mod pallet {
             origin: OriginFor<T>,
             uxt: Box<<T as Config>::Extrinsic>,
             address_seed: AccountIdLookupOf<T>,
-            zk_material: ZkMaterial,
+            zk_material: ZkMaterial<MomentOf<T>>,
         ) -> DispatchResultWithPostInfo {
             // make sure this call is unsigned signed
             ensure_none(origin)?;
 
             // check ephemeral key's expiration time
-            let now = T::BlockNumberProvider::current_block_number();
-            let expire_at: BlockNumberFor<T> = zk_material.get_ephkey_expire_at().into();
+            let now = T::Time::now();
+            let expire_at: MomentOf<T> = zk_material.get_ephkey_expire_at();
             ensure!(expire_at >= now, Error::<T>::EphKeyExpired);
 
             // execute real call
@@ -254,7 +261,7 @@ pub mod pallet {
                     let signature_valid =
                         SignedPayload::<T>::verify::<T::AuthorityId>(payload, signature.clone());
                     if !signature_valid {
-                        return InvalidTransaction::BadProof.into()
+                        return InvalidTransaction::BadProof.into();
                     }
                     // TODO validate payload, at least need to verify the public.
 
@@ -274,6 +281,7 @@ pub mod pallet {
 }
 
 pub type CheckedOf<E, C> = <E as Checkable<C>>::Checked;
+
 struct Executive<T>(sp_std::marker::PhantomData<T>);
 
 impl<T: Config> Executive<T>

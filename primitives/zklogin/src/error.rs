@@ -3,6 +3,9 @@ use ark_relations::r1cs::SynthesisError;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ZkAuthError {
+    /// Expire Time Format Error
+    ExpireAtFormatError,
+
     /// Circom error
     FqParseError,
 

@@ -64,6 +64,7 @@ frame_support::construct_runtime!(
     pub enum Test
     {
         System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
+        Timestamp: pallet_timestamp,
         Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
         ZkLogin: super::{Pallet, Call, Event<T>, ValidateUnsigned},
     }
@@ -81,6 +82,9 @@ impl frame_system::Config for Test {
     type AccountData = pallet_balances::AccountData<u64>;
 }
 
+#[derive_impl(pallet_timestamp::config_preludes::TestDefaultConfig)]
+impl pallet_timestamp::Config for Test {}
+
 #[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
 impl pallet_balances::Config for Test {
     type AccountStore = System;
@@ -92,7 +96,7 @@ impl super::Config for Test {
     type Extrinsic = MockUncheckedExtrinsic;
     type CheckedExtrinsic = MockCheckedExtrinsic;
     type UnsignedValidator = Test;
-    type BlockNumberProvider = System;
+    type Time = Timestamp;
 }
 
 fn zk_address() -> AccountId {

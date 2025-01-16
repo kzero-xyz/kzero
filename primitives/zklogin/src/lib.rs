@@ -181,7 +181,7 @@ impl Default for ZkLoginEnv {
 
 /// The material that is used for zkproof verification
 #[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq, Eq)]
-pub struct ZkMaterial {
+pub struct ZkMaterial<Moment> {
     // source: (JwkProvider, Kid),
     /// (JwkProvider,kid) that is used to get the corresponding `n`, which
     /// will be used in zk proof verification
@@ -191,18 +191,18 @@ pub struct ZkMaterial {
     /// ZkProof
     inputs: ZkLoginInputs,
     /// When the ephemeral key is expired
-    ephkey_expire_at: u32,
+    ephkey_expire_at: Moment,
     /// The ephemeral public key, for more specific, the ephemeral key
     /// is used to sign the extrinsic
     eph_pubkey: PubKey,
 }
 
-impl ZkMaterial {
+impl<Moment: Copy + TryInto<u64>> ZkMaterial<Moment> {
     pub fn new(
         provider: JwkProvider,
         kid: Kid,
         inputs: ZkLoginInputs,
-        ephkey_expire_at: u32,
+        ephkey_expire_at: Moment,
         eph_pubkey: [u8; 32],
     ) -> Self {
         Self { provider, kid, inputs, ephkey_expire_at, eph_pubkey }
@@ -224,7 +224,7 @@ impl ZkMaterial {
         return self.eph_pubkey;
     }
 
-    pub fn get_ephkey_expire_at(&self) -> u32 {
+    pub fn get_ephkey_expire_at(&self) -> Moment {
         return self.ephkey_expire_at;
     }
     /// entry to handle zklogin proof verification
@@ -246,7 +246,7 @@ impl ZkMaterial {
                 address_seed_u256,
                 &self.eph_pubkey,
                 &modulus,
-                self.ephkey_expire_at,
+                self.ephkey_expire_at.try_into().map_err(|_| ZkAuthError::ExpireAtFormatError)?,
             )?],
         ) {
             Ok(true) => Ok(()),
