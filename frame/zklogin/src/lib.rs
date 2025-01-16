@@ -14,7 +14,7 @@ use frame_support::{
     traits::Time,
 };
 use sp_runtime::{
-    traits::{Applyable, BlockNumberProvider, Checkable, Dispatchable, Extrinsic, StaticLookup},
+    traits::{Applyable, Checkable, Dispatchable, Extrinsic, StaticLookup},
     transaction_validity::{
         InvalidTransaction, TransactionValidityError, UnknownTransaction, ValidTransaction,
     },

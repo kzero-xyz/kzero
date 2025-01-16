@@ -82,8 +82,21 @@ impl frame_system::Config for Test {
     type AccountData = pallet_balances::AccountData<u64>;
 }
 
+impl frame_system::offchain::SigningTypes for Test {
+    type Public = <Signature as Verify>::Signer;
+    type Signature = Signature;
+}
+
 #[derive_impl(pallet_timestamp::config_preludes::TestDefaultConfig)]
 impl pallet_timestamp::Config for Test {}
+
+impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test
+where
+    RuntimeCall: From<LocalCall>,
+{
+    type OverarchingCall = RuntimeCall;
+    type Extrinsic = MockUncheckedExtrinsic;
+}
 
 #[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
 impl pallet_balances::Config for Test {
@@ -91,6 +104,7 @@ impl pallet_balances::Config for Test {
 }
 
 impl super::Config for Test {
+    type AuthorityId = crate::crypto::ZkLoginAuthId;
     type RuntimeEvent = RuntimeEvent;
     type Context = Context;
     type Extrinsic = MockUncheckedExtrinsic;
