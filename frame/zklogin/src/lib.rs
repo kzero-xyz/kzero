@@ -14,14 +14,17 @@ use frame_support::{
     traits::Time,
 };
 use sp_runtime::{
-    traits::{Applyable, Checkable, Dispatchable, Extrinsic, StaticLookup},
+    traits::{Applyable, Checkable, Dispatchable, Extrinsic,SignaturePayload, StaticLookup},
     transaction_validity::{
         InvalidTransaction, TransactionValidityError, UnknownTransaction, ValidTransaction,
     },
 };
 use sp_std::prelude::*;
 
-use primitive_zklogin::{replace_sender::ReplaceSender, Jwk, JwkProvider, Kid, ZkMaterial};
+use primitive_zklogin::{
+    traits::{ExtrinsicExt, ReplaceSender, SignaturePayloadExt},
+    EphPubKey, Jwk, JwkProvider, Kid, ZkMaterial,
+};
 
 use crate::offchain_worker::JwksPayload;
 // re-export
@@ -52,6 +55,8 @@ pub mod pallet {
         + frame_system::Config
     where
         Self::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+        <<Self as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+        <<<Self as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
     {
         /// The identifier type for an offchain worker.
         type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
@@ -63,7 +68,7 @@ pub mod pallet {
         /// Same as `Executive`, required by `Checkable` for `Self::Extrinsic`
         type Context: Default;
 
-        type Extrinsic: Extrinsic<Call = Self::RuntimeCall>
+        type Extrinsic: ExtrinsicExt<Call = Self::RuntimeCall>
             + Checkable<Self::Context, Checked = Self::CheckedExtrinsic>
             + Codec
             + TypeInfo
@@ -84,6 +89,8 @@ pub mod pallet {
     pub enum Event<T: Config>
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+        <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
     {
         ZkLoginExecuted { result: DispatchResult },
     }
@@ -117,6 +124,8 @@ pub mod pallet {
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+        <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
     {
         fn offchain_worker(block_number: BlockNumberFor<T>) {
             offchain_worker::offchain_worker_entrypoint::<T>(block_number);
@@ -127,6 +136,8 @@ pub mod pallet {
     impl<T: Config> Pallet<T>
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+        <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
     {
         // TODO: provide a valid weight
         #[pallet::call_index(0)]
@@ -187,6 +198,8 @@ pub mod pallet {
     impl<T: Config> Pallet<T>
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+        <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
     {
         fn insert_jwks(provider: JwkProvider, jwks: Vec<Jwk>) -> Result<(), Error<T>> {
             // TODO delete old jwks first, then insert new
@@ -203,6 +216,8 @@ pub mod pallet {
     impl<T: Config> ValidateUnsigned for Pallet<T>
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+        <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
         T: frame_system::Config<AccountId = AccountId32>,
     {
         type Call = Call<T>;
@@ -225,9 +240,21 @@ pub mod pallet {
                         .ok_or::<TransactionValidityError>(InvalidTransaction::Call.into())?;
 
                     // Only signed extrinsic is allowed
-                    if !uxt.is_signed().unwrap_or(false) {
-                        return InvalidTransaction::Call.into();
-                    }
+                    let eph_pubkey = match uxt.signature_payload() {
+                        // This extrinsic is not a signed one.
+                        None => return InvalidTransaction::Call.into(),
+                        Some(payload) => {
+                            let mut pubkey: EphPubKey = Default::default();
+                            let payload_key = payload.signature_address().as_ref();
+                            let len = pubkey.len();
+                            if payload_key.len() < len {
+                                pubkey[0..payload_key.len() ].copy_from_slice(payload_key);
+                            } else {
+                                pubkey.copy_from_slice(&payload_key[0..len]);
+                            };
+                            pubkey
+                        }
+                    };
 
                     // the zkLogin address that will pay for the tx fee and execute the real call
                     let address_seed = T::Lookup::lookup(address_seed.clone())?;
@@ -252,7 +279,7 @@ pub mod pallet {
 
                     // validate zk proof
                     zk_material
-                        .verify_zk_login(&address_seed, &jwk)
+                        .verify_zk_login(eph_pubkey, &address_seed, &jwk)
                         .map_err(|_| InvalidTransaction::BadProof)?;
 
                     xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
@@ -287,6 +314,8 @@ struct Executive<T>(sp_std::marker::PhantomData<T>);
 impl<T: Config> Executive<T>
 where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
 {
     fn apply_extrinsic(
         uxt: Box<<T as Config>::Extrinsic>,
@@ -316,6 +345,8 @@ where
 impl<T: Config> From<TransactionValidityError> for Error<T>
 where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
 {
     fn from(value: TransactionValidityError) -> Self {
         match value {

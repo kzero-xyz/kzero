@@ -1,4 +1,4 @@
-use crate::{error::ZkAuthError, poseidon::poseidon_zk_login, zk_input::Bn254Fr, PubKey};
+use crate::{error::ZkAuthError, poseidon::poseidon_zk_login, zk_input::Bn254Fr, EphPubKey};
 use num_bigint::BigUint;
 use sp_std::{vec, vec::Vec};
 
@@ -59,7 +59,7 @@ fn big_int_array_to_bits(arr: &[BigUint], int_size: usize) -> Vec<u8> {
 /// Split the pubkey into 2 slice
 /// Note: eph_pk_bytes is a 32-bytes long fixed u8 array
 /// No need to worry about the spill
-pub fn split_to_two_frs(eph_pk_bytes: &PubKey) -> Result<(Bn254Fr, Bn254Fr), ZkAuthError> {
+pub fn split_to_two_frs(eph_pk_bytes: &EphPubKey) -> Result<(Bn254Fr, Bn254Fr), ZkAuthError> {
     // Split the bytes deterministically such that the first element contains the first 128
     // bits of the hash, and the second element contains the latter ones.
     let (first_half, second_half) = eph_pk_bytes.split_at(eph_pk_bytes.len() - 16);

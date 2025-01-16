@@ -10,10 +10,11 @@ use sp_runtime::{
     traits::Dispatchable,
     RuntimeAppPublic,
 };
+use sp_runtime::traits::{Extrinsic, SignaturePayload};
 use sp_std::vec::Vec;
 // zklogin and local
 use crate::{Call, Config, Jwks};
-use primitive_zklogin::{Jwk, JwkProvider, JwkProviderErr};
+use primitive_zklogin::{Jwk, JwkProvider, JwkProviderErr, traits::SignaturePayloadExt};
 
 const TARGET: &str = "offchain-worker::zklogin";
 
@@ -65,6 +66,8 @@ type RuntimeAppPublicOf<T> = <<T as Config>::AuthorityId as AppCrypto<
 fn readable_key_type<T: Config>(id: &sp_core::crypto::KeyTypeId) -> &str
 where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
 {
     sp_std::str::from_utf8(id.0.as_slice()).unwrap_or("<invalid>")
 }
@@ -72,6 +75,8 @@ where
 pub fn offchain_worker_entrypoint<T: Config>(block_number: BlockNumberFor<T>)
 where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
 {
     log::debug!(target: TARGET, "ZkLogin offchain worker. number: {:?}", block_number);
     // TODO for now, anybody can submit this transaction, we need a group to limit.
@@ -148,6 +153,8 @@ fn submit_unsigned<T: Config>(
 ) -> Result<(), &'static str>
 where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
 {
     // -- Sign using any account
     let (_, result) = Signer::<T, T::AuthorityId>::any_account()
