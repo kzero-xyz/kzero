@@ -19,7 +19,7 @@ fn main() {
     // transfer to 0x197cf48b729ff12596cbc046c7fe8f88f92ac5f0b6fc42b4c1dcc532d37ccea2 first
 
     // get zk-related variables for zk-proof verifying
-    let (address_seed, input_data, expire_at, eph_pubkey) = get_raw_data();
+    let (address_seed, input_data, expire_at, _) = get_raw_data();
     let inputs = get_zklogin_inputs(input_data);
 
     // A test key, may can replace to any one, but must ed25519 key pair.
@@ -34,8 +34,7 @@ fn main() {
     // let google_jwk = jwks[0].clone();
 
     // construct zk proof
-    let zk_material =
-        ZkMaterial::new(JwkProvider::Google, google_kid, inputs, expire_at, eph_pubkey);
+    let zk_material = ZkMaterial::new(JwkProvider::Google, google_kid, inputs, expire_at);
 
     // construct inner example call, using transfer as example
     // construct Transfer Call

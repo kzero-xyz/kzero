@@ -22,8 +22,8 @@ use sp_runtime::{
 use sp_std::prelude::*;
 
 use primitive_zklogin::{
-    traits::{ExtrinsicExt, ReplaceSender, SignaturePayloadExt},
-    EphPubKey, Jwk, JwkProvider, Kid, ZkMaterial,
+    traits::{ExtrinsicExt, ReplaceSender, SignaturePayloadExt, TryIntoEphPubKey},
+    Jwk, JwkProvider, Kid, ZkMaterial,
 };
 
 use crate::offchain_worker::JwksPayload;
@@ -56,7 +56,7 @@ pub mod pallet {
     where
         Self::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
         <<Self as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<Self as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
+        <<<Self as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
     {
         /// The identifier type for an offchain worker.
         type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
@@ -90,7 +90,7 @@ pub mod pallet {
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
         <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
     {
         ZkLoginExecuted { result: DispatchResult },
     }
@@ -125,7 +125,7 @@ pub mod pallet {
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
         <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
     {
         fn offchain_worker(block_number: BlockNumberFor<T>) {
             offchain_worker::offchain_worker_entrypoint::<T>(block_number);
@@ -137,7 +137,7 @@ pub mod pallet {
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
         <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
     {
         // TODO: provide a valid weight
         #[pallet::call_index(0)]
@@ -199,7 +199,7 @@ pub mod pallet {
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
         <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
     {
         fn insert_jwks(provider: JwkProvider, jwks: Vec<Jwk>) -> Result<(), Error<T>> {
             // TODO delete old jwks first, then insert new
@@ -217,7 +217,7 @@ pub mod pallet {
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
         <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
         T: frame_system::Config<AccountId = AccountId32>,
     {
         type Call = Call<T>;
@@ -244,15 +244,10 @@ pub mod pallet {
                         // This extrinsic is not a signed one.
                         None => return InvalidTransaction::Call.into(),
                         Some(payload) => {
-                            let mut pubkey: EphPubKey = Default::default();
-                            let payload_key = payload.signature_address().as_ref();
-                            let len = pubkey.len();
-                            if payload_key.len() < len {
-                                pubkey[0..payload_key.len() ].copy_from_slice(payload_key);
-                            } else {
-                                pubkey.copy_from_slice(&payload_key[0..len]);
-                            };
-                            pubkey
+                            payload.signature_address().try_into_eph_key().map_err::<TransactionValidityError, _>(|e| {
+                                log::warn!(target: TARGET, "The signer can not convert to a valid eph pubkey. err: {:?}", e);
+                                InvalidTransaction::BadSigner.into()
+                            })?
                         }
                     };
 
@@ -315,7 +310,7 @@ impl<T: Config> Executive<T>
 where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
     <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
+    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
 {
     fn apply_extrinsic(
         uxt: Box<<T as Config>::Extrinsic>,
@@ -346,7 +341,7 @@ impl<T: Config> From<TransactionValidityError> for Error<T>
 where
     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
     <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: AsRef<[u8]>,
+    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
 {
     fn from(value: TransactionValidityError) -> Self {
         match value {
