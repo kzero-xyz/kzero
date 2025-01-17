@@ -1,5 +1,5 @@
-# zkMass  - A ZkLogin Framework
-zkMass is a Substrate-based framework that facilitates transaction initiation on the blockchain using zkLogin mechnism, which any substrate-based can easily integrate with.
+# KZero  - A ZkLogin Framework
+Kzero is a Substrate-based framework that facilitates transaction initiation on the blockchain using zkLogin mechnism, which any substrate-based can easily integrate with.
 
 ## Features
 
@@ -7,7 +7,7 @@ zkMass is a Substrate-based framework that facilitates transaction initiation on
 Users can initiate the onboarding process with a single click by choosing to "Login with Google," after that, users can easily start to submit transactions.
 
 ### On-Demand Key Replacement:
-zkMass introduces a revolutionary approach to key management, empowering users to seamlessly change their local temporary private keys at their convenience while providing the option to set expiration times for each key. This innovative feature ensures that even in the event of a compromised or lost private key used in the past, the security of the current account remains uncompromised.
+KZero introduces a revolutionary approach to key management, empowering users to seamlessly change their local temporary private keys at their convenience while providing the option to set expiration times for each key. This innovative feature ensures that even in the event of a compromised or lost private key used in the past, the security of the current account remains uncompromised.
 
 ### Maximum Security Assurance
 kMass prioritizes maximum security, requiring a combination of multiple sensitive elements for any potential threat to account security. Users must **simultaneously** compromise the temporary private key, the JWT from Google, and the address salt to pose a credible risk to the safety of their accounts.
@@ -29,25 +29,11 @@ Users can login with Google, Twitch, Kakao, Facebook, Apple, Slack.
 
 (Step 7) A transaction is signed using the ephemeral private key to generate an ephemeral signature. Finally, the user submits the transaction along with the ephemeral signature, ZK proof and other inputs to Chain.
 
-(After Step 7) After submitted on chain, the zkMass framework verifies the ZK proof against the provider JWKs from storage (agreed upon in consensus) and also the ephemeral signature.
+(After Step 7) After submitted on chain, the KZero framework verifies the ZK proof against the provider JWKs from storage (agreed upon in consensus) and also the ephemeral signature.
 
-## Integration Solution
-There are 2 solutions provided, project can choose either of them to integrate with.
 
-### Solution 1: replace `MultiSignature` in `Runtime`
-Usually in runtime of substrate-based project, the following line is used to define runtime signature:
-```rust
-pub type Signature = MultiSignature;
-```
-For those who want to use zkLogin, replace it with the following:
-```rust
-use zk_runtime::ZkMultiSignature;
-pub type Signature = ZkMultiSignature<MultiSignature>;
-```
-This solution will also accept normal transactions.
-
-### Solution 2: add `pallet-zklogin` into `Runtime`
-zkMass provide a zklogin pallet under frame, you can add it to your own runtime:
+## Integration: add `pallet-zklogin` into `Runtime`
+KZero provide a zklogin pallet under frame, you can add it to your own runtime:
 ```rust
 impl pallet_zklogin::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
@@ -60,7 +46,7 @@ impl pallet_zklogin::Config for Runtime {
 
     type Context = frame_system::ChainContext<Runtime>;
 
-    type BlockNumberProvider = System;
+    type Time = Timestamp;
 }
 
 construct_runtime!(
