@@ -145,7 +145,7 @@ fn validate_unsigned_should_work() {
     let source = sp_runtime::transaction_validity::TransactionSource::External;
 
     // get zk-related variables for zk-proof verifying
-    let (address_seed, input_data, expire_at, eph_pubkey) = get_raw_data();
+    let (address_seed, input_data, expire_at, _) = get_raw_data();
     let inputs = get_zklogin_inputs(input_data);
 
     let signing_key: ed25519::Pair = get_test_eph_key();
@@ -155,7 +155,7 @@ fn validate_unsigned_should_work() {
     let kids = google::kids();
     let kid = kids[0].clone();
 
-    let zk_material = ZkMaterial::new(provider, kid, inputs, expire_at, eph_pubkey);
+    let zk_material = ZkMaterial::new(provider, kid, inputs, expire_at);
 
     // construct Transfer Call
     let dest = AccountId::from([0u8; 32]);

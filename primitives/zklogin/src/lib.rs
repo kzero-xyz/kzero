@@ -28,22 +28,20 @@ pub use jsonwebtoken::{
 
 mod circom;
 mod error;
-// mod jwk;
 mod poseidon;
 mod pvk;
-pub mod replace_sender;
-#[cfg(feature = "testing")]
-pub mod test_helper;
-#[cfg(all(test, feature = "testing"))]
-mod tests;
 mod utils;
 mod zk_input;
+// public mod
+#[cfg(feature = "testing")]
+pub mod test_helper;
+pub mod traits;
 
 pub const PACK_WIDTH: u8 = 248;
 pub const EPH_PUB_KEY_LEN: usize = 32;
 
 /// The Ephemeral Public Key should be [u8; 32]
-pub type PubKey = [u8; EPH_PUB_KEY_LEN];
+pub type EphPubKey = [u8; EPH_PUB_KEY_LEN];
 
 /// Parse Jwk from a json bytes.
 pub fn jwk_from_slice(json: &[u8]) -> serde_json::Result<Jwk> {
@@ -138,7 +136,7 @@ impl JwkProvider {
                 let value =
                     map.get_mut(Self::COMMON_JWKS_KEY).ok_or(JwkProviderErr::NotFoundJwks)?;
                 if !value.is_array() {
-                    return Err(JwkProviderErr::InvalidJson(value.clone()))
+                    return Err(JwkProviderErr::InvalidJson(value.clone()));
                 }
 
                 let jwks = value.take();
@@ -192,9 +190,6 @@ pub struct ZkMaterial<Moment> {
     inputs: ZkLoginInputs,
     /// When the ephemeral key is expired
     ephkey_expire_at: Moment,
-    /// The ephemeral public key, for more specific, the ephemeral key
-    /// is used to sign the extrinsic
-    eph_pubkey: PubKey,
 }
 
 impl<Moment: Copy + TryInto<u64>> ZkMaterial<Moment> {
@@ -203,9 +198,8 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterial<Moment> {
         kid: Kid,
         inputs: ZkLoginInputs,
         ephkey_expire_at: Moment,
-        eph_pubkey: [u8; 32],
     ) -> Self {
-        Self { provider, kid, inputs, ephkey_expire_at, eph_pubkey }
+        Self { provider, kid, inputs, ephkey_expire_at }
     }
 
     pub fn get_provider(&self) -> JwkProvider {
@@ -220,21 +214,22 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterial<Moment> {
         (self.provider, &self.kid)
     }
 
-    pub fn get_eph_pubkey(&self) -> PubKey {
-        return self.eph_pubkey;
-    }
-
     pub fn get_ephkey_expire_at(&self) -> Moment {
         return self.ephkey_expire_at;
     }
     /// entry to handle zklogin proof verification
-    pub fn verify_zk_login(&self, address_seed: &AccountId32, jwk: &Jwk) -> ZkAuthResult<()> {
+    pub fn verify_zk_login(
+        &self,
+        eph_pubkey: EphPubKey,
+        address_seed: &AccountId32,
+        jwk: &Jwk,
+    ) -> ZkAuthResult<()> {
         let modulus = if let AlgorithmParameters::RSA(ref key_params) = jwk.algorithm {
             // Decode modulus to bytes.
             Base64UrlUnpadded::decode_vec(&key_params.n)
                 .map_err(|_| ZkAuthError::ModulusDecodeError)?
         } else {
-            return Err(ZkAuthError::UnsupportedAlgorithm)
+            return Err(ZkAuthError::UnsupportedAlgorithm);
         };
 
         let address_seed_u256 = U256::from_big_endian(address_seed.as_ref());
@@ -244,7 +239,7 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterial<Moment> {
             &self.inputs.get_proof().as_arkworks()?,
             &[self.inputs.calculate_all_inputs_hash(
                 address_seed_u256,
-                &self.eph_pubkey,
+                &eph_pubkey,
                 &modulus,
                 self.ephkey_expire_at.try_into().map_err(|_| ZkAuthError::ExpireAtFormatError)?,
             )?],

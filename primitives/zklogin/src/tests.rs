@@ -5,7 +5,7 @@ use crate::{
 
 #[test]
 fn verify_zklogin() {
-    let (address_seed, input_data, max_epoch, eph_pubkey_bytes) = get_raw_data();
+    let (address_seed, input_data, max_epoch, _) = get_raw_data();
     let input = get_zklogin_inputs(input_data);
 
     let kids = google::kids();
@@ -14,7 +14,7 @@ fn verify_zklogin() {
     let kid = kids[0].clone();
     let jwk = jwks[0].clone();
 
-    let zk_material = ZkMaterial::new(JwkProvider::Google, kid, input, max_epoch, eph_pubkey_bytes);
+    let zk_material = ZkMaterial::new(JwkProvider::Google, kid, input, max_epoch);
     let zklogin_result = zk_material.verify_zk_login(&address_seed, &jwk);
 
     assert!(zklogin_result.is_ok())
