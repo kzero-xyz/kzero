@@ -7,14 +7,16 @@ use frame_system::{
 };
 use sp_runtime::{
     offchain::{http, Duration},
-    traits::Dispatchable,
+    traits::{Dispatchable, Extrinsic, SignaturePayload},
     RuntimeAppPublic,
 };
-use sp_runtime::traits::{Extrinsic, SignaturePayload};
 use sp_std::vec::Vec;
 // zklogin and local
 use crate::{Call, Config, Jwks};
-use primitive_zklogin::{Jwk, JwkProvider, JwkProviderErr, traits::{SignaturePayloadExt, TryIntoEphPubKey}};
+use primitive_zklogin::{
+    traits::{SignaturePayloadExt, TryIntoEphPubKey},
+    Jwk, JwkProvider, JwkProviderErr,
+};
 
 const TARGET: &str = "offchain-worker::zklogin";
 

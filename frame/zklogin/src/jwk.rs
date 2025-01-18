@@ -2,7 +2,11 @@ use frame_support::dispatch::{DispatchInfo, PostDispatchInfo};
 use sp_runtime::traits::{Dispatchable, Extrinsic, SignaturePayload};
 
 use crate::{Config, Error, TARGET};
-use primitive_zklogin::{jwk_from_slice, traits::{SignaturePayloadExt, TryIntoEphPubKey}, Jwk};
+use primitive_zklogin::{
+    jwk_from_slice,
+    traits::{SignaturePayloadExt, TryIntoEphPubKey},
+    Jwk,
+};
 
 pub fn parse_jwk<T: Config>(json: &[u8]) -> sp_std::result::Result<Jwk, Error<T>>
 where
