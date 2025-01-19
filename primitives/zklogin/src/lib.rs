@@ -74,6 +74,8 @@ pub enum JwkProvider {
     Apple,
     /// See https://slack.com/.well-known/openid-configuration
     Slack,
+    /// See https://token.actions.githubusercontent.com/.well-known/openid-configuration
+    Github,
 }
 
 impl JwkProvider {
@@ -89,12 +91,13 @@ impl JwkProvider {
             JwkProvider::Kakao => "https://kauth.kakao.com/.well-known/openid-configuration",
             JwkProvider::Apple => "https://appleid.apple.com/.well-known/openid-configuration",
             JwkProvider::Slack => "https://slack.com/.well-known/openid-configuration",
+            JwkProvider::Github => "https://token.actions.githubusercontent.com/.well-known/openid-configuration",
         }
     }
 
     pub fn iterator() -> impl Iterator<Item = Self> {
         use JwkProvider::*;
-        [Google, Twitch, Facebook, Kakao, Apple, Slack].iter().copied()
+        [Google, Twitch, Facebook, Kakao, Apple, Slack, Github].iter().copied()
     }
 
     pub fn fetch_jwks<E>(
