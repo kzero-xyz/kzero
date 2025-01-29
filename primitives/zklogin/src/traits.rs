@@ -1,7 +1,11 @@
 use scale_info::TypeInfo;
 use sp_core::crypto::AccountId32;
 
-use sp_runtime::{generic::{CheckedExtrinsic, UncheckedExtrinsic}, traits::{Extrinsic, SignaturePayload, SignedExtension}, MultiAddress};
+use sp_runtime::{
+    generic::{CheckedExtrinsic, UncheckedExtrinsic},
+    traits::{Extrinsic, SignaturePayload, SignedExtension},
+    MultiAddress,
+};
 
 use crate::EphPubKey;
 
@@ -94,30 +98,24 @@ fn extend_to_eph_pubkey(source: &[u8]) -> Result<EphPubKey, EphPubkeyErr> {
     Ok(pubkey)
 }
 
-impl<AccountId: AsRef<[u8]>, AccountIndex> TryIntoEphPubKey for MultiAddress<AccountId, AccountIndex> {
+impl<AccountId: AsRef<[u8]>, AccountIndex> TryIntoEphPubKey
+    for MultiAddress<AccountId, AccountIndex>
+{
     fn try_into_eph_key(&self) -> Result<EphPubKey, EphPubkeyErr> {
         (&self).try_into_eph_key()
     }
 }
 
-impl<AccountId: AsRef<[u8]>, AccountIndex> TryIntoEphPubKey for &MultiAddress<AccountId, AccountIndex> {
+impl<AccountId: AsRef<[u8]>, AccountIndex> TryIntoEphPubKey
+    for &MultiAddress<AccountId, AccountIndex>
+{
     fn try_into_eph_key(&self) -> Result<EphPubKey, EphPubkeyErr> {
         match self {
-            MultiAddress::Id(account_id) => {
-                extend_to_eph_pubkey(account_id.as_ref())
-            }
-            MultiAddress::Index(_index) => {
-                Err(EphPubkeyErr::Invalid)
-            }
-            MultiAddress::Raw(raw) => {
-                extend_to_eph_pubkey(raw.as_ref())
-            }
-            MultiAddress::Address32(bytes32) => {
-                extend_to_eph_pubkey(bytes32.as_ref())
-            }
-            MultiAddress::Address20(bytes20) => {
-                extend_to_eph_pubkey(bytes20.as_ref())
-            }
+            MultiAddress::Id(account_id) => extend_to_eph_pubkey(account_id.as_ref()),
+            MultiAddress::Index(_index) => Err(EphPubkeyErr::Invalid),
+            MultiAddress::Raw(raw) => extend_to_eph_pubkey(raw.as_ref()),
+            MultiAddress::Address32(bytes32) => extend_to_eph_pubkey(bytes32.as_ref()),
+            MultiAddress::Address20(bytes20) => extend_to_eph_pubkey(bytes20.as_ref()),
         }
     }
 }

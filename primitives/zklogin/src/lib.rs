@@ -91,7 +91,9 @@ impl JwkProvider {
             JwkProvider::Kakao => "https://kauth.kakao.com/.well-known/openid-configuration",
             JwkProvider::Apple => "https://appleid.apple.com/.well-known/openid-configuration",
             JwkProvider::Slack => "https://slack.com/.well-known/openid-configuration",
-            JwkProvider::Github => "https://token.actions.githubusercontent.com/.well-known/openid-configuration",
+            JwkProvider::Github => {
+                "https://token.actions.githubusercontent.com/.well-known/openid-configuration"
+            }
         }
     }
 

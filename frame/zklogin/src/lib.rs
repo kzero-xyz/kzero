@@ -14,7 +14,7 @@ use frame_support::{
     traits::Time,
 };
 use sp_runtime::{
-    traits::{Applyable, Checkable, Dispatchable, Extrinsic,SignaturePayload, StaticLookup},
+    traits::{Applyable, Checkable, Dispatchable, Extrinsic, SignaturePayload, StaticLookup},
     transaction_validity::{
         InvalidTransaction, TransactionValidityError, UnknownTransaction, ValidTransaction,
     },
@@ -61,6 +61,9 @@ pub mod pallet {
         /// The identifier type for an offchain worker.
         type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
 
+        /// The maximum number of keys that can be added.
+        type MaxKeys: Get<u32>;
+
         type RuntimeEvent: From<Event<Self>>
             + IsType<<Self as frame_system::Config>::RuntimeEvent>
             + TryInto<Event<Self>>;
@@ -90,7 +93,7 @@ pub mod pallet {
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
         <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
+        // <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
     {
         ZkLoginExecuted { result: DispatchResult },
     }
@@ -114,11 +117,16 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
+    /// The current set of keys that may submit a offchain extrinsic.
+    #[pallet::storage]
+    pub type Keys<T: Config> =
+        StorageValue<_, WeakBoundedVec<T::AuthorityId, T::MaxKeys>, ValueQuery>;
+
     /// TODO
     #[pallet::storage]
     #[pallet::unbounded]
     pub(crate) type Jwks<T> =
-        StorageDoubleMap<_, Blake2_128Concat, JwkProvider, Blake2_128Concat, Kid, Jwk>;
+        StorageDoubleMap<_, Twox64Concat, JwkProvider, Twox64Concat, Kid, Jwk>;
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
