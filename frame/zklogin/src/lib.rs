@@ -5,7 +5,7 @@ mod offchain_worker;
 #[cfg(test)]
 mod tests;
 
-use scale_codec::{Codec, Encode};
+use scale_codec::{Codec, Encode, MaxEncodedLen};
 
 use frame_support::{
     dispatch::{
@@ -59,7 +59,7 @@ pub mod pallet {
         <<<Self as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
     {
         /// The identifier type for an offchain worker.
-        type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+        type AuthorityId: AppCrypto<Self::Public, Self::Signature> + Parameter + MaxEncodedLen;
 
         /// The maximum number of keys that can be added.
         type MaxKeys: Get<u32>;
@@ -93,7 +93,7 @@ pub mod pallet {
     where
         T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
         <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        // <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
+        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
     {
         ZkLoginExecuted { result: DispatchResult },
     }
@@ -117,7 +117,7 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
-    /// The current set of keys that may submit a offchain extrinsic.
+    /// The current set of keys that may submit an offchain extrinsic.
     #[pallet::storage]
     pub type Keys<T: Config> =
         StorageValue<_, WeakBoundedVec<T::AuthorityId, T::MaxKeys>, ValueQuery>;
@@ -185,6 +185,38 @@ pub mod pallet {
                     // TODO print event and logs.
                 }
             }
+            Ok(().into())
+        }
+
+        #[pallet::call_index(254)]
+        #[pallet::weight(({0}, DispatchClass::Operational))]
+        pub fn update_keys(
+            origin: OriginFor<T>,
+            keys: Vec<(T::AuthorityId, bool)>,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            let mut current_keys = Keys::<T>::get();
+            for (key, insert_or_delete) in keys {
+                let existed = current_keys.iter().position(|x| x == &key);
+                match (existed, insert_or_delete) {
+                    (Some(index), false) => {
+                        let _k = current_keys.remove(index);
+                        // TODO print logs for this removed key
+                    }
+                    (None, true) => {
+                        // It's a new key, append it.
+                        if insert_or_delete {
+                            if let Err(_) = current_keys.try_push(key) {
+                                // TODO print logs
+                            }
+                        }
+                    }
+                    _ => { /* ignore */ }
+                }
+            }
+            Keys::<T>::put(current_keys);
+            // TODO events
             Ok(().into())
         }
 
