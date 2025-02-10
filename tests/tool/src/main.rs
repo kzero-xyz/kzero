@@ -34,7 +34,7 @@ fn main() {
     // let google_jwk = jwks[0].clone();
 
     // construct zk proof
-    let zk_material = ZkMaterial::new(JwkProvider::Google, google_kid, inputs, expire_at);
+    let zk_material = ZkMaterialV1::new(JwkProvider::Google, google_kid, inputs, expire_at).into();
 
     // construct inner example call, using transfer as example
     // construct Transfer Call

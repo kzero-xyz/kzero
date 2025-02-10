@@ -7,7 +7,7 @@ use frame_support::{
 use pallet_balances::Call as BalancesCall;
 use primitive_zklogin::{
     test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs, test_cases::google},
-    JwkProvider, ZkMaterial,
+    JwkProvider, ZkMaterialV1,
 };
 use scale_codec::{Decode, Encode};
 use sp_core::{ed25519, Pair};
@@ -155,7 +155,7 @@ fn validate_unsigned_should_work() {
     let kids = google::kids();
     let kid = kids[0].clone();
 
-    let zk_material = ZkMaterial::new(provider, kid, inputs, expire_at);
+    let zk_material = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
 
     // construct Transfer Call
     let dest = AccountId::from([0u8; 32]);
