@@ -182,9 +182,52 @@ impl Default for ZkLoginEnv {
     }
 }
 
-/// The material that is used for zkproof verification
+/// Aliasing type for `VersionedZkMaterial`.
+pub type ZkMaterial<Moment> = VersionedZkMaterial<Moment>;
+
+/// ZkMaterial with versioned prefix.
 #[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq, Eq)]
-pub struct ZkMaterial<Moment> {
+pub enum VersionedZkMaterial<Moment> {
+    V1(ZkMaterialV1<Moment>),
+}
+
+impl<Moment: Copy + TryInto<u64>> VersionedZkMaterial<Moment> {
+    /// Return ephkey expire time.
+    pub fn get_ephkey_expire_at(&self) -> Moment {
+        match self {
+            VersionedZkMaterial::V1(v1) => v1.get_ephkey_expire_at(),
+        }
+    }
+
+    /// JwkProvider and Key id.
+    pub fn source(&self) -> (JwkProvider, &Kid) {
+        match self {
+            VersionedZkMaterial::V1(v1) => v1.source(),
+        }
+    }
+
+    /// entry to handle zklogin proof verification
+    pub fn verify_zk_login(
+        &self,
+        eph_pubkey: EphPubKey,
+        address_seed: &AccountId32,
+        jwk: &Jwk,
+    ) -> ZkAuthResult<()> {
+        match self {
+            VersionedZkMaterial::V1(v1) => v1.verify_zk_login(eph_pubkey, address_seed, jwk),
+        }
+    }
+}
+
+impl<Moment> From<ZkMaterialV1<Moment>> for VersionedZkMaterial<Moment> {
+    fn from(value: ZkMaterialV1<Moment>) -> Self {
+        VersionedZkMaterial::V1(value)
+    }
+}
+
+/// The material that is used for zkproof verification (Version 1)
+#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq, Eq)]
+pub struct ZkMaterialV1<Moment> {
     // source: (JwkProvider, Kid),
     /// (JwkProvider,kid) that is used to get the corresponding `n`, which
     /// will be used in zk proof verification
@@ -197,7 +240,7 @@ pub struct ZkMaterial<Moment> {
     ephkey_expire_at: Moment,
 }
 
-impl<Moment: Copy + TryInto<u64>> ZkMaterial<Moment> {
+impl<Moment: Copy + TryInto<u64>> ZkMaterialV1<Moment> {
     pub fn new(
         provider: JwkProvider,
         kid: Kid,
@@ -220,7 +263,7 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterial<Moment> {
     }
 
     pub fn get_ephkey_expire_at(&self) -> Moment {
-        return self.ephkey_expire_at;
+        self.ephkey_expire_at
     }
     /// entry to handle zklogin proof verification
     pub fn verify_zk_login(
