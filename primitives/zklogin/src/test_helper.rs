@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use sp_core::{crypto::AccountId32, ed25519::Pair as Ed25519Pair, Pair, U256};
 use std::str::FromStr;
+use crate::circom::BigNumber;
 
 const MAX_KEY_CLAIM_NAME_LENGTH: u8 = 32;
 const MAX_KEY_CLAIM_VALUE_LENGTH: u8 = 115;
@@ -52,7 +53,11 @@ impl From<ClaimJson> for Claim {
 
 impl From<ZkLoginProofJson> for ZkLoginProof {
     fn from(value: ZkLoginProofJson) -> Self {
-        let convert = |s: &str| U256::from_dec_str(s).expect("");
+        let convert = |s: &str| -> BigNumber {
+            let mut buf = s.as_bytes().to_vec();
+            buf.reverse();
+            BigNumber::truncate_from(buf)
+        };
 
         let a = [convert(&value.a[0]), convert(&value.a[1]), convert(&value.a[2])];
         let b = [

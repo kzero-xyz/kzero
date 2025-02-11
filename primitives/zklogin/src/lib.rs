@@ -35,6 +35,8 @@ mod zk_input;
 // public mod
 #[cfg(feature = "testing")]
 pub mod test_helper;
+#[cfg(all(feature = "testing", test))]
+mod tests;
 pub mod traits;
 
 pub const PACK_WIDTH: u8 = 248;
