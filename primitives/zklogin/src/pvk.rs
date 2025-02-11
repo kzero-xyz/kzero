@@ -1,8 +1,7 @@
-use crate::circom::{g1_affine_from_bytes_projective, g2_affine_from_bytes_projective};
+use crate::circom::{g1_affine_from_str_projective, g2_affine_from_str_projective};
 use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
-use sp_core::U256;
-use sp_std::vec::Vec;
+
 mod prod {
     use crate::circom::{StrCircomG1, StrCircomG2};
 
@@ -33,7 +32,7 @@ mod prod {
             "8495653923123431417604973247489272438418190587263600148770280649306958101930",
             "4082367875863433681332203403145435568316851327593401208105741076214120093531",
         ],
-        ["1", "0"]
+        ["1", "0"],
     ];
 
     pub const VK_DELTA_2: StrCircomG2 = [
@@ -45,20 +44,20 @@ mod prod {
             "14489104692423540990601374549557603533921811847080812036788172274404299703364",
             "12564378633583954025611992187142343628816140907276948128970903673042690269191",
         ],
-        ["1", "0"]
+        ["1", "0"],
     ];
 
     pub const E: [StrCircomG1; 2] = [
         [
             "1607694606386445293170795095076356565829000940041894770459712091642365695804",
             "18066827569413962196795937356879694709963206118612267170825707780758040578649",
-            "1"
+            "1",
         ],
         [
             "20653794344898475822834426774542692225449366952113790098812854265588083247207",
             "3296759704176575765409730962060698204792513807296274014163938591826372646699",
-            "1"
-        ]
+            "1",
+        ],
     ];
 }
 
@@ -79,7 +78,7 @@ mod test {
             "17943105074568074607580970189766801116106680981075272363121544016828311544390",
             "18339640667362802607939727433487930605412455701857832124655129852540230493587",
         ],
-        ["1", "0"]
+        ["1", "0"],
     ];
 
     pub const VK_GAMMA_2: StrCircomG2 = [
@@ -91,7 +90,7 @@ mod test {
             "8495653923123431417604973247489272438418190587263600148770280649306958101930",
             "4082367875863433681332203403145435568316851327593401208105741076214120093531",
         ],
-        [ "1", "0"]
+        ["1", "0"],
     ];
 
     pub const VK_DELTA_2: StrCircomG2 = [
@@ -103,19 +102,19 @@ mod test {
             "14489104692423540990601374549557603533921811847080812036788172274404299703364",
             "12564378633583954025611992187142343628816140907276948128970903673042690269191",
         ],
-        ["1", "0"]
+        ["1", "0"],
     ];
 
     pub const E: [StrCircomG1; 2] = [
         [
             "1607694606386445293170795095076356565829000940041894770459712091642365695804",
             "18066827569413962196795937356879694709963206118612267170825707780758040578649",
-            "1"
+            "1",
         ],
         [
             "20653794344898475822834426774542692225449366952113790098812854265588083247207",
             "3296759704176575765409730962060698204792513807296274014163938591826372646699",
-            "1"
+            "1",
         ],
     ];
 }
@@ -123,13 +122,14 @@ mod test {
 /// The prepared verifying key for production env.
 pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
     // Convert the Circom G1/G2/GT to arkworks G1/G2/GT
-    let vk_alpha_1 = g1_affine_from_bytes_projective(&prod::VK_ALPHA_1, false).unwrap();
-    let vk_beta_2 = g2_affine_from_bytes_projective(&prod::VK_BETA_2, false).unwrap();
-    let vk_gamma_2 = g2_affine_from_bytes_projective(&prod::VK_GAMMA_2, false).unwrap();
-    let vk_delta_2 = g2_affine_from_bytes_projective(&prod::VK_DELTA_2, false).unwrap();
+    let vk_alpha_1 = g1_affine_from_str_projective(&prod::VK_ALPHA_1).unwrap();
+    let vk_beta_2 = g2_affine_from_str_projective(&prod::VK_BETA_2).unwrap();
+    let vk_gamma_2 = g2_affine_from_str_projective(&prod::VK_GAMMA_2).unwrap();
+    let vk_delta_2 = g2_affine_from_str_projective(&prod::VK_DELTA_2).unwrap();
 
     // Create a vector of G1Affine elements from the IC
-    let vk_gamma_abc_g1 = prod::E.iter().map(|e| g1_affine_from_bytes_projective(e, false).unwrap()).collect();
+    let vk_gamma_abc_g1 =
+        prod::E.iter().map(|e| g1_affine_from_str_projective(e).unwrap()).collect();
 
     let vk = VerifyingKey {
         alpha_g1: vk_alpha_1,
@@ -146,13 +146,14 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
 /// The prepared verifying key for testing.
 pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
     // Convert the Circom G1/G2/GT to arkworks G1/G2/GT
-    let vk_alpha_1 = g1_affine_from_bytes_projective(&test::VK_ALPHA_1, false).unwrap();
-    let vk_beta_2 = g2_affine_from_bytes_projective(&test::VK_BETA_2, false).unwrap();
-    let vk_gamma_2 = g2_affine_from_bytes_projective(&test::VK_GAMMA_2, false).unwrap();
-    let vk_delta_2 = g2_affine_from_bytes_projective(&test::VK_DELTA_2, false).unwrap();
+    let vk_alpha_1 = g1_affine_from_str_projective(&test::VK_ALPHA_1).unwrap();
+    let vk_beta_2 = g2_affine_from_str_projective(&test::VK_BETA_2).unwrap();
+    let vk_gamma_2 = g2_affine_from_str_projective(&test::VK_GAMMA_2).unwrap();
+    let vk_delta_2 = g2_affine_from_str_projective(&test::VK_DELTA_2).unwrap();
 
     // Create a vector of G1Affine elements from the IC
-    let vk_gamma_abc_g1 = test::E.iter().map(|e| g1_affine_from_bytes_projective(e, false).unwrap()).collect();
+    let vk_gamma_abc_g1 =
+        test::E.iter().map(|e| g1_affine_from_str_projective(e).unwrap()).collect();
 
     let vk = VerifyingKey {
         alpha_g1: vk_alpha_1,

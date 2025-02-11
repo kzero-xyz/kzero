@@ -1,5 +1,7 @@
 use crate::{
-    circom::{g1_affine_from_bytes_projective, g2_affine_from_bytes_projective, CircomG1, CircomG2},
+    circom::{
+        g1_affine_from_bytes_projective, g2_affine_from_bytes_projective, CircomG1, CircomG2,
+    },
     error::{FrParseError, ZkAuthError},
     poseidon::poseidon_zk_login,
     utils::{hash_to_field, split_to_two_frs},
