@@ -286,7 +286,7 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterialV1<Moment> {
 
         // Calculate all inputs hash and passed to the verification function.
         match verify_zklogin_proof_in_prod(
-            &self.inputs.get_proof().as_arkworks()?,
+            &self.inputs.get_proof().as_arkworks(),
             &[self.inputs.calculate_all_inputs_hash(
                 address_seed_u256,
                 &eph_pubkey,

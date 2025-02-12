@@ -81,11 +81,11 @@ pub struct ZkLoginProof {
 
 impl ZkLoginProof {
     /// Convert the Circom G1/G2/GT to arkworks G1/G2/GT
-    pub fn as_arkworks(&self) -> Result<Proof<Bn254>, ZkAuthError> {
-        Ok(Proof {
-            a: g1_affine_from_bytes_projective(&self.a, true)?,
-            b: g2_affine_from_bytes_projective(&self.b, true)?,
-            c: g1_affine_from_bytes_projective(&self.c, true)?,
-        })
+    pub fn as_arkworks(&self) -> Proof<Bn254> {
+        Proof {
+            a: g1_affine_from_bytes_projective(&self.a, true),
+            b: g2_affine_from_bytes_projective(&self.b, true),
+            c: g1_affine_from_bytes_projective(&self.c, true),
+        }
     }
 }

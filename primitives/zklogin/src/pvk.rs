@@ -1,4 +1,4 @@
-use crate::circom::{g1_affine_from_str_projective, g2_affine_from_str_projective};
+use crate::circom::{unsafe_g1_affine_from_str_projective, unsafe_g2_affine_from_str_projective};
 use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 
@@ -122,14 +122,13 @@ mod test {
 /// The prepared verifying key for production env.
 pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
     // Convert the Circom G1/G2/GT to arkworks G1/G2/GT
-    let vk_alpha_1 = g1_affine_from_str_projective(&prod::VK_ALPHA_1).unwrap();
-    let vk_beta_2 = g2_affine_from_str_projective(&prod::VK_BETA_2).unwrap();
-    let vk_gamma_2 = g2_affine_from_str_projective(&prod::VK_GAMMA_2).unwrap();
-    let vk_delta_2 = g2_affine_from_str_projective(&prod::VK_DELTA_2).unwrap();
+    let vk_alpha_1 = unsafe_g1_affine_from_str_projective(&prod::VK_ALPHA_1);
+    let vk_beta_2 = unsafe_g2_affine_from_str_projective(&prod::VK_BETA_2);
+    let vk_gamma_2 = unsafe_g2_affine_from_str_projective(&prod::VK_GAMMA_2);
+    let vk_delta_2 = unsafe_g2_affine_from_str_projective(&prod::VK_DELTA_2);
 
     // Create a vector of G1Affine elements from the IC
-    let vk_gamma_abc_g1 =
-        prod::E.iter().map(|e| g1_affine_from_str_projective(e).unwrap()).collect();
+    let vk_gamma_abc_g1 = prod::E.iter().map(|e| unsafe_g1_affine_from_str_projective(e)).collect();
 
     let vk = VerifyingKey {
         alpha_g1: vk_alpha_1,
@@ -146,14 +145,13 @@ pub(crate) fn prod_pvk() -> PreparedVerifyingKey<Bn254> {
 /// The prepared verifying key for testing.
 pub(crate) fn test_pvk() -> PreparedVerifyingKey<Bn254> {
     // Convert the Circom G1/G2/GT to arkworks G1/G2/GT
-    let vk_alpha_1 = g1_affine_from_str_projective(&test::VK_ALPHA_1).unwrap();
-    let vk_beta_2 = g2_affine_from_str_projective(&test::VK_BETA_2).unwrap();
-    let vk_gamma_2 = g2_affine_from_str_projective(&test::VK_GAMMA_2).unwrap();
-    let vk_delta_2 = g2_affine_from_str_projective(&test::VK_DELTA_2).unwrap();
+    let vk_alpha_1 = unsafe_g1_affine_from_str_projective(&test::VK_ALPHA_1);
+    let vk_beta_2 = unsafe_g2_affine_from_str_projective(&test::VK_BETA_2);
+    let vk_gamma_2 = unsafe_g2_affine_from_str_projective(&test::VK_GAMMA_2);
+    let vk_delta_2 = unsafe_g2_affine_from_str_projective(&test::VK_DELTA_2);
 
     // Create a vector of G1Affine elements from the IC
-    let vk_gamma_abc_g1 =
-        test::E.iter().map(|e| g1_affine_from_str_projective(e).unwrap()).collect();
+    let vk_gamma_abc_g1 = test::E.iter().map(|e| unsafe_g1_affine_from_str_projective(e)).collect();
 
     let vk = VerifyingKey {
         alpha_g1: vk_alpha_1,
