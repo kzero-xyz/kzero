@@ -8,7 +8,7 @@ use node_template::node_template_runtime::{
 };
 use primitive_zklogin::{
     test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs, test_cases::google},
-    JwkProvider, ZkMaterial,
+    JwkProvider, ZkMaterialV1
 };
 
 // must replace this genesis to your own
