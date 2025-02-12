@@ -1,5 +1,7 @@
 use crate::{
-    circom::{g1_affine_from_str_projective, g2_affine_from_str_projective, CircomG1, CircomG2},
+    circom::{
+        g1_affine_from_bytes_projective, g2_affine_from_bytes_projective, CircomG1, CircomG2,
+    },
     error::{FrParseError, ZkAuthError},
     poseidon::poseidon_zk_login,
     utils::{hash_to_field, split_to_two_frs},
@@ -79,11 +81,11 @@ pub struct ZkLoginProof {
 
 impl ZkLoginProof {
     /// Convert the Circom G1/G2/GT to arkworks G1/G2/GT
-    pub fn as_arkworks(&self) -> Result<Proof<Bn254>, ZkAuthError> {
-        Ok(Proof {
-            a: g1_affine_from_str_projective(&self.a)?,
-            b: g2_affine_from_str_projective(&self.b)?,
-            c: g1_affine_from_str_projective(&self.c)?,
-        })
+    pub fn as_arkworks(&self) -> Proof<Bn254> {
+        Proof {
+            a: g1_affine_from_bytes_projective(&self.a, true),
+            b: g2_affine_from_bytes_projective(&self.b, true),
+            c: g1_affine_from_bytes_projective(&self.c, true),
+        }
     }
 }

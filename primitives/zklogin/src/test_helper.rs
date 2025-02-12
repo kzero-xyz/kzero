@@ -1,4 +1,5 @@
 use crate::{
+    circom::BigNumber,
     error::{ZkAuthError, ZkAuthResult},
     poseidon::poseidon_zk_login,
     zk_input::{Bn254Fr, Claim, ZkLoginInputs, ZkLoginProof},
@@ -52,7 +53,10 @@ impl From<ClaimJson> for Claim {
 
 impl From<ZkLoginProofJson> for ZkLoginProof {
     fn from(value: ZkLoginProofJson) -> Self {
-        let convert = |s: &str| U256::from_dec_str(s).expect("");
+        let convert = |s: &str| -> BigNumber {
+            let uint = BigUint::parse_bytes(s.as_bytes(), 10).expect("Must be a valid dec number.");
+            BigNumber::truncate_from(uint.to_bytes_le())
+        };
 
         let a = [convert(&value.a[0]), convert(&value.a[1]), convert(&value.a[2])];
         let b = [
