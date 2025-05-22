@@ -17,6 +17,7 @@ use crate::{
 use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use num_bigint::BigUint;
+use rand;
 use sp_runtime::traits::Clear;
 use std::str::FromStr;
 
@@ -250,8 +251,8 @@ fn verify_zklogin() {
     let (address_seed, input_data, max_epoch, eph_pubkey) = get_raw_data();
     let input = get_zklogin_inputs(input_data);
 
-    let kids = google::kids();
-    let jwks = google::jwks();
+    let kids = google::kids(true);
+    let jwks = google::jwks(true);
 
     let kid = kids[0].clone();
     let jwk = jwks[0].clone();
@@ -261,4 +262,81 @@ fn verify_zklogin() {
     let zklogin_result = zk_material.verify_zk_login(eph_pubkey, &address_seed, &jwk);
 
     assert!(zklogin_result.is_ok())
+}
+
+#[test]
+fn zk_login_should_fail_when_jwk_not_match() {
+    let (address_seed, input_data, max_epoch, eph_pubkey) = get_raw_data();
+    let input = get_zklogin_inputs(input_data);
+
+    let kids = google::kids(false);
+    let jwks = google::jwks(false);
+
+    let kid = kids[0].clone();
+    let jwk = jwks[0].clone();
+
+    let zk_material: ZkMaterial<u64> =
+        ZkMaterialV1::new(JwkProvider::Google, kid, input, max_epoch).into();
+    let zklogin_result = zk_material.verify_zk_login(eph_pubkey, &address_seed, &jwk);
+
+    assert!(zklogin_result.is_err())
+}
+
+#[test]
+fn zk_login_should_fail_when_eph_pubkey_not_match() {
+    let (address_seed, input_data, max_epoch, _) = get_raw_data();
+    let input = get_zklogin_inputs(input_data);
+
+    let kids = google::kids(true);
+    let jwks = google::jwks(true);
+
+    let kid = kids[0].clone();
+    let jwk = jwks[0].clone();
+
+    let invalid_eph_pubkey = [u8::try_from(rand::random::<u8>()).unwrap_or(0); 32];
+    let zk_material: ZkMaterial<u64> =
+        ZkMaterialV1::new(JwkProvider::Google, kid, input, max_epoch).into();
+    let zklogin_result = zk_material.verify_zk_login(invalid_eph_pubkey, &address_seed, &jwk);
+
+    assert!(zklogin_result.is_err())
+}
+
+#[test]
+fn zk_login_should_fail_when_max_epoch_not_match() {
+    let (address_seed, input_data, _, eph_pubkey) = get_raw_data();
+    let input = get_zklogin_inputs(input_data);
+
+    let kids = google::kids(false);
+    let jwks = google::jwks(false);
+
+    let kid = kids[0].clone();
+    let jwk = jwks[0].clone();
+
+    let invalid_max_epoch = rand::random::<u64>() % 501; // Random number between 0-500
+    let zk_material: ZkMaterial<u64> =
+        ZkMaterialV1::new(JwkProvider::Google, kid, input, invalid_max_epoch).into();
+    let zklogin_result = zk_material.verify_zk_login(eph_pubkey, &address_seed, &jwk);
+
+    assert!(zklogin_result.is_err())
+}
+
+#[test]
+fn zk_login_should_fail_when_address_seed_not_match() {
+    let (_, input_data, max_epoch, eph_pubkey) = get_raw_data();
+    let input = get_zklogin_inputs(input_data);
+
+    let kids = google::kids(true);
+    let jwks = google::jwks(true);
+
+    let kid = kids[0].clone();
+    let jwk = jwks[0].clone();
+
+    let random_seed = [u8::try_from(rand::random::<u8>()).unwrap_or(0); 32];
+    let invalid_address_seed = AccountId32::from(random_seed);
+
+    let zk_material: ZkMaterial<u64> =
+        ZkMaterialV1::new(JwkProvider::Google, kid, input, max_epoch).into();
+    let zklogin_result = zk_material.verify_zk_login(eph_pubkey, &invalid_address_seed, &jwk);
+
+    assert!(zklogin_result.is_err())
 }

@@ -277,15 +277,37 @@ pub mod test_cases {
             }"#,
         ];
 
-        pub fn jwks() -> Vec<Jwk> {
-            GOOGLE_JWK_JSON_LIST
-                .into_iter()
-                .map(|s| jwk_from_slice(s.as_bytes()).expect("Test case muse be a valid jwk"))
-                .collect()
+        pub const WRONG_GOOGLE_JWK_JSON_LIST: [&str; 2] = [
+            r#"{
+                "kty": "RSA",
+                "alg": "RS256",
+                "e": "AQAB",
+                "n": "jb7Wtq9aDMpiXvHGCB5nrfAS2UutDEkSbK16aDtDhbYJhDWhd7vqWhFbnP0C_XkSxsqWJoku69y49EzgabEiUMf0q3X5N0pNvV64krviH2m9uLnyGP5GMdwZpjTXARK9usGgYZGuWhjfgTTvooKDUdqVQYvbrmXlblkM6xjbA8GnShSaOZ4AtMJCjWnaN_UaMD_vAXvOYj4SaefDMSlSoiI46yipFdggfoIV8RDg1jeffyre_8DwOWsGz7b2yQrL7grhYCvoiPrybKmViXqu-17LTIgBw6TDk8EzKdKzm33_LvxU7AKs3XWW_NvZ4WCPwp4gr7uw6RAkdDX_ZAn0TQ",
+                "kid": "23f7a3583796f97129e5418f9b2136fcc0a96462"
+            }"#,
+            r#"{
+                "e": "AQAB",
+                "kid": "07b80a365428525f8bf7cd0846d74a8ee4ef3625",
+                "kty": "RSA",
+                "n": "03Cww27F2O7JxB5Ji9iT9szfKZ4MK-iPzVpQkdLjCuGKfpjaCVAz9zIQ0-7gbZ-8cJRaSLfByWTGMIHRYiX2efdjz1Z9jck0DK9W3mapFrBPvM7AlRni4lPlwUigDd8zxAMDCheqyK3vCOLFW-1xYHt_YGwv8b0dP7rjujarEYlWjeppO_QMNtXdKdT9eZtBEcj_9ms9W0aLdCFNR5AAR3y0kLkKR1H4DW7vncB46rqCJLenhlCbcW0MZ3asqcjqBQ2t9QMRnY83Zf_pNEsCcXlKp4uOQqEvzjAc9ZSr2sOmd_ESZ_3jMlNkCZ4J41TuG-My5illFcW5LajSKvxD3w",
+                "alg": "RS256"
+            }"#,
+        ];
+        pub fn jwks(is_valid: bool) -> Vec<Jwk> {
+            match is_valid {
+                true => GOOGLE_JWK_JSON_LIST
+                    .into_iter()
+                    .map(|s| jwk_from_slice(s.as_bytes()).expect("Test case muse be a valid jwk"))
+                    .collect(),
+                false => WRONG_GOOGLE_JWK_JSON_LIST
+                    .into_iter()
+                    .map(|s| jwk_from_slice(s.as_bytes()).expect("Test case muse be a valid jwk"))
+                    .collect(),
+            }
         }
 
-        pub fn kids() -> Vec<Kid> {
-            jwks()
+        pub fn kids(is_valid: bool) -> Vec<Kid> {
+            jwks(is_valid)
                 .into_iter()
                 .map(|jwk| {
                     jwk.common.key_id.expect("Test case JWK must has kid").as_bytes().to_vec()
