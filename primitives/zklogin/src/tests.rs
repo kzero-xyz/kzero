@@ -1,3 +1,7 @@
+use crate::test_helper::test_cases::poseidon_hash::{
+    POSEIDON_0_TO_29, POSEIDON_0_TO_32, POSEIDON_1, POSEIDON_1_2, POSEIDON_1_TO_15,
+    POSEIDON_1_TO_16,
+};
 use crate::test_helper::test_cases::valid_affine::{
     E, INVALID_TYPE_VALUES, INVALID_VALUES, VK_ALPHA_1, VK_BETA_2, VK_DELTA_2, VK_GAMMA_2,
 };
@@ -18,7 +22,7 @@ use std::str::FromStr;
 
 // ================================ Test cases for affine points on the curve ================================
 #[test]
-fn valid_affine_should_be_on_curve() {
+fn test_valid_affine_should_be_on_curve() {
     let valid_vk_alpha_1 = StrCircomG1::from(VK_ALPHA_1);
     let vk_alpha_1 = unsafe_g1_affine_from_str_projective(&valid_vk_alpha_1);
     assert!(vk_alpha_1.is_on_curve());
@@ -61,7 +65,7 @@ fn valid_affine_should_be_on_curve() {
 }
 
 #[test]
-fn invalid_affine_should_not_be_on_curve() {
+fn test_invalid_affine_should_not_be_on_curve() {
     // Create an invalid point by using values that won't be on the curve
     let invalid_vk_alpha_1 = StrCircomG1::from(INVALID_VALUES);
     let vk_alpha_1 = unsafe_g1_affine_from_str_projective(&invalid_vk_alpha_1);
@@ -74,7 +78,7 @@ fn invalid_affine_should_not_be_on_curve() {
 }
 
 #[test]
-fn invalid_affine_type_should_be_rejected() {
+fn test_invalid_affine_type_should_be_rejected() {
     let invalid_vk_alpha_1 = StrCircomG1::from(INVALID_TYPE_VALUES);
     // This should panic with the message "String must be an valid number."
     let result =
@@ -107,21 +111,15 @@ fn to_bigint_arr(vals: Vec<u8>) -> Vec<Fr> {
 #[test]
 fn test_to_poseidon_hash() {
     assert!(poseidon_merkle_tree(to_bigint_arr(vec![])).is_err());
-    assert_eq!(
-        poseidon_merkle_tree(to_bigint_arr(vec![1])).unwrap().to_string(),
-        "18586133768512220936620570745912940619677854269274689475585506675881198879027"
-    );
-    assert_eq!(
-        poseidon_merkle_tree(to_bigint_arr(vec![1, 2])).unwrap().to_string(),
-        "7853200120776062878684798364095072458815029376092732009249414926327459813530"
-    );
+    assert_eq!(poseidon_merkle_tree(to_bigint_arr(vec![1])).unwrap().to_string(), POSEIDON_1);
+    assert_eq!(poseidon_merkle_tree(to_bigint_arr(vec![1, 2])).unwrap().to_string(), POSEIDON_1_2);
     assert_eq!(
         poseidon_merkle_tree(to_bigint_arr(vec![
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
         ]))
         .unwrap()
         .to_string(),
-        "4203130618016961831408770638653325366880478848856764494148034853759773445968"
+        POSEIDON_1_TO_15
     );
     assert_eq!(
         poseidon_merkle_tree(to_bigint_arr(vec![
@@ -129,7 +127,7 @@ fn test_to_poseidon_hash() {
         ]))
         .unwrap()
         .to_string(),
-        "9989051620750914585850546081941653841776809718687451684622678807385399211877"
+        POSEIDON_1_TO_16
     );
     assert_eq!(
         poseidon_merkle_tree(to_bigint_arr(vec![
@@ -138,7 +136,7 @@ fn test_to_poseidon_hash() {
         ]))
         .unwrap()
         .to_string(),
-        "4123755143677678663754455867798672266093104048057302051129414708339780424023"
+        POSEIDON_0_TO_29
     );
     assert_eq!(
         poseidon_merkle_tree(to_bigint_arr(vec![
@@ -147,16 +145,13 @@ fn test_to_poseidon_hash() {
         ]))
         .unwrap()
         .to_string(),
-        "15368023340287843142129781602124963668572853984788169144128906033251913623349"
+        POSEIDON_0_TO_32
     );
 }
 
 // ================================ Test cases for traits part ================================
 use sp_core::crypto::AccountId32;
-use sp_runtime::{
-    generic::{CheckedExtrinsic, UncheckedExtrinsic},
-    MultiAddress,
-};
+use sp_runtime::{generic::CheckedExtrinsic, MultiAddress};
 
 #[test]
 fn test_replace_sender() {
@@ -231,6 +226,22 @@ fn test_try_into_eph_pubkey() {
     let mut expected = [0u8; 32];
     expected[0..20].copy_from_slice(&address20);
     assert_eq!(result.unwrap(), expected);
+}
+
+// ================================ Test cases for utils ================================
+use crate::utils::hash_to_field;
+#[test]
+fn test_hash_to_field() {
+    let input = vec![BigUint::from(5u32)];
+    let result = hash_to_field(&input, 4, 2);
+    assert!(result.is_ok());
+}
+
+#[test]
+#[should_panic(expected = "chunk size must be non-zero")]
+fn test_hash_to_field_overflow() {
+    let input = vec![BigUint::from(5u32)];
+    let _ = hash_to_field(&input, 4, 0); // This should panic with overflow
 }
 
 // ================================ Test cases for zklogin ================================
