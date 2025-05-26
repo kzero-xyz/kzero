@@ -37,6 +37,7 @@ jsonwebtoken = { workspace = true }
 
 [dev-dependencies]
 serde = { workspace = true, features = ["std", "derive"] }
+rand = "0.8.5"
 
 [features]
 runtime-benchmarks = [

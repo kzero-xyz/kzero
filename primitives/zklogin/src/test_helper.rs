@@ -277,20 +277,110 @@ pub mod test_cases {
             }"#,
         ];
 
-        pub fn jwks() -> Vec<Jwk> {
-            GOOGLE_JWK_JSON_LIST
-                .into_iter()
-                .map(|s| jwk_from_slice(s.as_bytes()).expect("Test case muse be a valid jwk"))
-                .collect()
+        pub const WRONG_GOOGLE_JWK_JSON_LIST: [&str; 2] = [
+            r#"{
+                "kty": "RSA",
+                "alg": "RS256",
+                "e": "AQAB",
+                "n": "jb7Wtq9aDMpiXvHGCB5nrfAS2UutDEkSbK16aDtDhbYJhDWhd7vqWhFbnP0C_XkSxsqWJoku69y49EzgabEiUMf0q3X5N0pNvV64krviH2m9uLnyGP5GMdwZpjTXARK9usGgYZGuWhjfgTTvooKDUdqVQYvbrmXlblkM6xjbA8GnShSaOZ4AtMJCjWnaN_UaMD_vAXvOYj4SaefDMSlSoiI46yipFdggfoIV8RDg1jeffyre_8DwOWsGz7b2yQrL7grhYCvoiPrybKmViXqu-17LTIgBw6TDk8EzKdKzm33_LvxU7AKs3XWW_NvZ4WCPwp4gr7uw6RAkdDX_ZAn0TQ",
+                "kid": "23f7a3583796f97129e5418f9b2136fcc0a96462"
+            }"#,
+            r#"{
+                "e": "AQAB",
+                "kid": "07b80a365428525f8bf7cd0846d74a8ee4ef3625",
+                "kty": "RSA",
+                "n": "03Cww27F2O7JxB5Ji9iT9szfKZ4MK-iPzVpQkdLjCuGKfpjaCVAz9zIQ0-7gbZ-8cJRaSLfByWTGMIHRYiX2efdjz1Z9jck0DK9W3mapFrBPvM7AlRni4lPlwUigDd8zxAMDCheqyK3vCOLFW-1xYHt_YGwv8b0dP7rjujarEYlWjeppO_QMNtXdKdT9eZtBEcj_9ms9W0aLdCFNR5AAR3y0kLkKR1H4DW7vncB46rqCJLenhlCbcW0MZ3asqcjqBQ2t9QMRnY83Zf_pNEsCcXlKp4uOQqEvzjAc9ZSr2sOmd_ESZ_3jMlNkCZ4J41TuG-My5illFcW5LajSKvxD3w",
+                "alg": "RS256"
+            }"#,
+        ];
+        pub fn jwks(is_valid: bool) -> Vec<Jwk> {
+            match is_valid {
+                true => GOOGLE_JWK_JSON_LIST
+                    .into_iter()
+                    .map(|s| jwk_from_slice(s.as_bytes()).expect("Test case muse be a valid jwk"))
+                    .collect(),
+                false => WRONG_GOOGLE_JWK_JSON_LIST
+                    .into_iter()
+                    .map(|s| jwk_from_slice(s.as_bytes()).expect("Test case muse be a valid jwk"))
+                    .collect(),
+            }
         }
 
-        pub fn kids() -> Vec<Kid> {
-            jwks()
+        pub fn kids(is_valid: bool) -> Vec<Kid> {
+            jwks(is_valid)
                 .into_iter()
                 .map(|jwk| {
                     jwk.common.key_id.expect("Test case JWK must has kid").as_bytes().to_vec()
                 })
                 .collect()
         }
+    }
+    pub mod valid_affine {
+        use crate::circom::{StrCircomG1, StrCircomG2};
+        pub const VK_ALPHA_1: StrCircomG1 = [
+            "21529901943976716921335152104180790524318946701278905588288070441048877064089",
+            "7775817982019986089115946956794180159548389285968353014325286374017358010641",
+            "1",
+        ];
+    
+        pub const VK_BETA_2: StrCircomG2 = [
+            [
+                "6600437987682835329040464538375790690815756241121776438004683031791078085074",
+                "16207344858883952201936462217289725998755030546200154201671892670464461194903",
+            ],
+            [
+                "17943105074568074607580970189766801116106680981075272363121544016828311544390",
+                "18339640667362802607939727433487930605412455701857832124655129852540230493587",
+            ],
+            ["1", "0"],
+        ];
+    
+        pub const VK_GAMMA_2: StrCircomG2 = [
+            [
+                "10857046999023057135944570762232829481370756359578518086990519993285655852781",
+                "11559732032986387107991004021392285783925812861821192530917403151452391805634",
+            ],
+            [
+                "8495653923123431417604973247489272438418190587263600148770280649306958101930",
+                "4082367875863433681332203403145435568316851327593401208105741076214120093531",
+            ],
+            ["1", "0"],
+        ];
+    
+        pub const VK_DELTA_2: StrCircomG2 = [
+            [
+                "19260309516619721648285279557078789954438346514188902804737557357941293711874",
+                "2480422554560175324649200374556411861037961022026590718777465211464278308900",
+            ],
+            [
+                "14489104692423540990601374549557603533921811847080812036788172274404299703364",
+                "12564378633583954025611992187142343628816140907276948128970903673042690269191",
+            ],
+            ["1", "0"],
+        ];
+    
+        pub const E: [StrCircomG1; 2] = [
+            [
+                "1607694606386445293170795095076356565829000940041894770459712091642365695804",
+                "18066827569413962196795937356879694709963206118612267170825707780758040578649",
+                "1",
+            ],
+            [
+                "20653794344898475822834426774542692225449366952113790098812854265588083247207",
+                "3296759704176575765409730962060698204792513807296274014163938591826372646699",
+                "1",
+            ],
+        ];
+        pub const INVALID_VALUES: [&'static str; 3] = ["123456789", "987654321", "1"];
+        pub const INVALID_TYPE_VALUES: [&'static str; 3] = ["hello", "world", "kzero"];
+    }
+    pub mod poseidon_hash {
+        // This is calculated by the poseidon hash code, you can check this via `https://www.poseidon-hash.info/``
+        pub const POSEIDON_1: &str = "18586133768512220936620570745912940619677854269274689475585506675881198879027";
+        pub const POSEIDON_1_2: &str = "7853200120776062878684798364095072458815029376092732009249414926327459813530";
+        pub const POSEIDON_1_TO_15: &str = "4203130618016961831408770638653325366880478848856764494148034853759773445968";
+        pub const POSEIDON_1_TO_16: &str = "9989051620750914585850546081941653841776809718687451684622678807385399211877";
+        pub const POSEIDON_0_TO_29: &str = "4123755143677678663754455867798672266093104048057302051129414708339780424023";
+        pub const POSEIDON_0_TO_32: &str = "15368023340287843142129781602124963668572853984788169144128906033251913623349";
     }
 }
