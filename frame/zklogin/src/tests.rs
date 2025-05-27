@@ -72,6 +72,7 @@ frame_support::construct_runtime!(
 
 parameter_types! {
     pub const BlockHashCount: u32 = 250;
+    pub const MaxKeys: u32 = 3;
 }
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
@@ -111,6 +112,7 @@ impl super::Config for Test {
     type CheckedExtrinsic = MockCheckedExtrinsic;
     type UnsignedValidator = Test;
     type Time = Timestamp;
+    type MaxKeys = MaxKeys;
 }
 
 fn zk_address() -> AccountId {
@@ -139,6 +141,8 @@ fn basic_setup_works() {
     })
 }
 
+
+// ================================ validate_unsigned ================================
 #[test]
 fn validate_unsigned_should_work() {
     use sp_runtime::traits::ValidateUnsigned;
@@ -152,7 +156,7 @@ fn validate_unsigned_should_work() {
 
     let provider = JwkProvider::Google;
     let jwks = google::GOOGLE_JWK_JSON_LIST[0];
-    let kids = google::kids();
+    let kids = google::kids(true);
     let kid = kids[0].clone();
 
     let zk_material = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
@@ -208,5 +212,58 @@ fn validate_unsigned_should_work() {
         assert_eq!(Balances::free_balance(&zk_address(),), 800);
         // transfer success
         assert_eq!(Balances::free_balance(&dest), 200);
+    });
+}
+
+#[test]
+fn validate_unsigned_should_fail_when_jwk_not_match() {
+    use sp_runtime::traits::ValidateUnsigned;
+    let source = sp_runtime::transaction_validity::TransactionSource::External;
+
+    // get zk-related variables for zk-proof verifying
+    let (address_seed, input_data, expire_at, _) = get_raw_data();
+    let inputs = get_zklogin_inputs(input_data);
+
+    let signing_key: ed25519::Pair = get_test_eph_key();
+
+    let provider = JwkProvider::Google;
+    let jwks = google::GOOGLE_JWK_JSON_LIST[1];
+    let kids = google::kids(true);
+    let kid = kids[0].clone();
+
+    let zk_material = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
+
+    // construct Transfer Call
+    let dest = AccountId::from([0u8; 32]);
+    let call: RuntimeCall =
+        BalancesCall::transfer_keep_alive { dest: MultiAddress::Id(dest.clone()), value: 100 }
+            .into();
+
+    let payload = SignedPayload::new(call.clone(), MockExtra).expect("payload should succeed");
+    let sign = payload.using_encoded(|d| signing_key.sign(d));
+
+    // construct inner unchecked_extrinsic
+    let uxt = MockUncheckedExtrinsic::new_signed(
+        call,
+        AccountId::from(signing_key.public()).into(),
+        MultiSignature::from(sign),
+        MockExtra,
+    );
+
+    let final_call = ZkLoginCall::submit_zklogin_unsigned {
+        uxt: Box::new(uxt),
+        address_seed: address_seed.into(),
+        zk_material,
+    };
+
+    new_test_ext().execute_with(|| {
+        // Set jwk from root.
+        assert_ok!(ZkLogin::set_jwk(RawOrigin::Root.into(), provider, jwks.as_bytes().to_vec()));
+
+        // the eph key's expiration at 834, make sure current number is smaller.
+        System::set_block_number(10);
+
+        // The JWK is not matched, so the validation should fail.
+        assert!(Pallet::<Test>::validate_unsigned(source, &final_call).is_err());
     });
 }
