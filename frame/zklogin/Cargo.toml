@@ -33,6 +33,7 @@ frame-executive = { workspace = true, features = ["default"] }
 pallet-balances = { workspace = true, features = ["default"] }
 pallet-timestamp = { workspace = true, features = ["default"] }
 primitive-zklogin = { workspace = true, features = ["default", "testing"] }
+jsonwebtoken = { workspace = true }
 
 [features]
 default = ["std"]

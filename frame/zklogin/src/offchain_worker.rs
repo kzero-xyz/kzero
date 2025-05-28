@@ -184,7 +184,7 @@ where
     result.map_err(|()| "Unable to submit transaction")
 }
 
-fn fetch_jwks() -> Vec<(JwkProvider, Vec<Jwk>)> {
+pub(crate) fn fetch_jwks() -> Vec<(JwkProvider, Vec<Jwk>)> {
     let mut result = Vec::new();
     for provider in JwkProvider::iterator() {
         match provider.fetch_jwks(fetch_obj) {
