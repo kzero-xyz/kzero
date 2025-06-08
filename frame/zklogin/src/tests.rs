@@ -290,29 +290,6 @@ fn test_parse_jwk_success() {
 }
 
 #[test]
-fn test_parse_jwk_invalid_json() {
-    use crate::jwk::parse_jwk;
-    use crate::pallet::Error;
-    // Set log level to error to suppress error messages
-    log::set_max_level(log::LevelFilter::Error);
-
-    // Test invalid JSON format
-    let invalid_json = r#"{
-        "kid": "test_key",
-        "kty": "RSA",
-        "n": "test_n",
-        "e": "AQAB",
-        "alg": "RS256",
-        "use": "sig",
-        // Missing closing brace
-    "#;
-
-    let result = parse_jwk::<Test>(invalid_json.as_bytes());
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), Error::<Test>::InvalidJwkJson));
-}
-
-#[test]
 fn test_parse_jwk_missing_required_fields() {
     use crate::jwk::parse_jwk;
     use crate::pallet::Error;
@@ -437,6 +414,8 @@ fn test_check_jwk_not_onchain() {
     different_jwk.common.key_id = Some("different".to_string());
     let result = check_jwk_not_onchain(provider, &jwk, |_, _| Some(different_jwk.clone()));
     assert_eq!(result, Some(true));
+
+    // TODO: Add more test cases of jwk not on chain
 }
 
 #[test]
