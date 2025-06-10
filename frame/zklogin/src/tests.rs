@@ -392,7 +392,7 @@ fn test_fetch_jwks() {
 }
 
 #[test]
-fn test_check_jwk_not_onchain() {
+fn test_check_jwk_not_onchain_when_not_exists() {
     use crate::offchain_worker::check_jwk_not_onchain;
     use primitive_zklogin::{Jwk, JwkProvider};
 
@@ -401,21 +401,41 @@ fn test_check_jwk_not_onchain() {
     let jwks = google::GOOGLE_JWK_JSON_LIST[0];
     let jwk: Jwk = serde_json::from_str(jwks).unwrap();
 
-    // Test case 1: JWK not on chain
+    // Test case: JWK not on chain
     let result = check_jwk_not_onchain(provider, &jwk, |_, _| None);
     assert_eq!(result, Some(true));
+}
 
-    // Test case 2: JWK exists on chain with same content
+#[test]
+fn test_check_jwk_not_onchain_when_same_content() {
+    use crate::offchain_worker::check_jwk_not_onchain;
+    use primitive_zklogin::{Jwk, JwkProvider};
+
+    // Set up test data
+    let provider = JwkProvider::Google;
+    let jwks = google::GOOGLE_JWK_JSON_LIST[0];
+    let jwk: Jwk = serde_json::from_str(jwks).unwrap();
+
+    // Test case: JWK exists on chain with same content
     let result = check_jwk_not_onchain(provider, &jwk, |_, _| Some(jwk.clone()));
     assert_eq!(result, Some(false));
+}
 
-    // Test case 3: JWK exists on chain with different content
+#[test]
+fn test_check_jwk_not_onchain_when_different_content() {
+    use crate::offchain_worker::check_jwk_not_onchain;
+    use primitive_zklogin::{Jwk, JwkProvider};
+
+    // Set up test data
+    let provider = JwkProvider::Google;
+    let jwks = google::GOOGLE_JWK_JSON_LIST[0];
+    let jwk: Jwk = serde_json::from_str(jwks).unwrap();
+
+    // Test case: JWK exists on chain with different content
     let mut different_jwk = jwk.clone();
     different_jwk.common.key_id = Some("different".to_string());
     let result = check_jwk_not_onchain(provider, &jwk, |_, _| Some(different_jwk.clone()));
     assert_eq!(result, Some(true));
-
-    // TODO: Add more test cases of jwk not on chain
 }
 
 #[test]
