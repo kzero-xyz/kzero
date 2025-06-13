@@ -28,7 +28,7 @@ fn main() {
     println!("{:?}", signing_pub);
 
     // let jwks = google::jwks();
-    let kids = google::kids();
+    let kids = google::kids(true);
     // can be used in test,
     let google_kid = kids[0].clone();
     // let google_jwk = jwks[0].clone();
