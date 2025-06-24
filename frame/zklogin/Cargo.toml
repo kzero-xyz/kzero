@@ -71,7 +71,3 @@ try-runtime = [
     "frame-system/try-runtime",
     "sp-runtime/try-runtime",
 ]
-
-[lib]
-name = "pallet_zklogin"
-path = "src/lib.rs"
