@@ -5,6 +5,15 @@ mod offchain_worker;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmark_data;
+
+#[cfg(feature = "runtime-benchmarks")]
+pub use benchmarking::*;
+
 use scale_codec::{Codec, Encode};
 
 use frame_support::{

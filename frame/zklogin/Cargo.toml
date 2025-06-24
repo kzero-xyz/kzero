@@ -27,6 +27,9 @@ sp-runtime = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 # zkloign
 primitive-zklogin = { workspace = true, default-features = false }
+# benchmark
+hex = { version = "0.4.3", default-features = false }
+frame-benchmarking = { workspace = true, default-features = false }
 
 [dev-dependencies]
 frame-executive = { workspace = true, features = ["default"] }
