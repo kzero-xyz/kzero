@@ -19,7 +19,7 @@ use sp_core::{crypto::AccountId32, U256};
 use sp_std::vec::Vec;
 
 pub use error::{ZkAuthError, ZkAuthResult};
-pub use zk_input::ZkLoginInputs;
+pub use zk_input::{ZkLoginInputs, ZkLoginProof, Claim};
 
 pub use jsonwebtoken::{
     errors::ErrorKind,
@@ -38,6 +38,9 @@ pub mod test_helper;
 #[cfg(all(feature = "testing", test))]
 mod tests;
 pub mod traits;
+
+// Re-export circom types for benchmark use
+pub use circom::BigNumber;
 
 pub const PACK_WIDTH: u8 = 248;
 pub const EPH_PUB_KEY_LEN: usize = 32;

@@ -35,26 +35,52 @@ use core::marker::PhantomData;
 /// Weight functions for `pallet_zklogin`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_zklogin::WeightInfo for WeightInfo<T> {
-	/// Storage: `ZkLogin::Jwks` (r:0 w:2)
+	/// Storage: `Timestamp::Now` (r:1 w:0)
+	/// Proof: `Timestamp::Now` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
+	/// Storage: `System::BlockHash` (r:1 w:0)
+	/// Proof: `System::BlockHash` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
+	/// Storage: `System::Account` (r:1 w:1)
+	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
+	/// Storage: `System::AllExtrinsicsLen` (r:1 w:1)
+	/// Proof: `System::AllExtrinsicsLen` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
+	/// Storage: `TransactionPayment::NextFeeMultiplier` (r:1 w:0)
+	/// Proof: `TransactionPayment::NextFeeMultiplier` (`max_values`: Some(1), `max_size`: Some(16), added: 511, mode: `MaxEncodedLen`)
+	fn submit_zklogin_unsigned() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `228`
+		//  Estimated: `3593`
+		// Minimum execution time: 82_000_000 picoseconds.
+		Weight::from_parts(83_000_000, 0)
+			.saturating_add(Weight::from_parts(0, 3593))
+			.saturating_add(T::DbWeight::get().reads(5))
+			.saturating_add(T::DbWeight::get().writes(2))
+	}
+	/// Storage: `ZkLogin::Jwks` (r:0 w:10)
 	/// Proof: `ZkLogin::Jwks` (`max_values`: None, `max_size`: None, mode: `Measured`)
-	fn submit_jwks_unsigned() -> Weight {
+	/// The range of component `c` is `[0, 10]`.
+	fn submit_jwks_unsigned(c: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `6`
 		//  Estimated: `6`
-		// Minimum execution time: 17_000_000 picoseconds.
-		Weight::from_parts(20_000_000, 0)
+		// Minimum execution time: 2_000_000 picoseconds.
+		Weight::from_parts(2_774_341, 0)
 			.saturating_add(Weight::from_parts(0, 6))
-			.saturating_add(T::DbWeight::get().writes(2))
+			// Standard Error: 32_737
+			.saturating_add(Weight::from_parts(7_471_605, 0).saturating_mul(c.into()))
+			.saturating_add(T::DbWeight::get().writes((1_u64).saturating_mul(c.into())))
 	}
 	/// Storage: `ZkLogin::Keys` (r:1 w:1)
 	/// Proof: `ZkLogin::Keys` (`max_values`: Some(1), `max_size`: None, mode: `Measured`)
-	fn update_keys() -> Weight {
+	/// The range of component `c` is `[0, 10]`.
+	fn update_keys(c: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `6`
 		//  Estimated: `1491`
-		// Minimum execution time: 6_000_000 picoseconds.
-		Weight::from_parts(6_000_000, 0)
+		// Minimum execution time: 5_000_000 picoseconds.
+		Weight::from_parts(6_113_936, 0)
 			.saturating_add(Weight::from_parts(0, 1491))
+			// Standard Error: 32_641
+			.saturating_add(Weight::from_parts(1_420_810, 0).saturating_mul(c.into()))
 			.saturating_add(T::DbWeight::get().reads(1))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
@@ -64,8 +90,8 @@ impl<T: frame_system::Config> pallet_zklogin::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
-		// Minimum execution time: 10_000_000 picoseconds.
-		Weight::from_parts(10_000_000, 0)
+		// Minimum execution time: 11_000_000 picoseconds.
+		Weight::from_parts(12_000_000, 0)
 			.saturating_add(Weight::from_parts(0, 0))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
