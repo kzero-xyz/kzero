@@ -11,6 +11,7 @@ mod benchmarking;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmark_data;
 
+pub mod weights;
 
 use scale_codec::{Codec, Encode};
 
@@ -36,6 +37,7 @@ use primitive_zklogin::{
 use crate::offchain_worker::JwksPayload;
 // re-export
 pub use crate::offchain_worker::crypto;
+pub use weights::WeightInfo;
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
@@ -92,6 +94,9 @@ pub mod pallet {
         type UnsignedValidator: ValidateUnsigned<Call = Self::RuntimeCall>;
 
         type Time: Time;
+
+        /// Weight information for extrinsics in this pallet.
+        type WeightInfo: WeightInfo;
     }
 
     #[pallet::event]
@@ -194,7 +199,7 @@ pub mod pallet {
 
         /// TODO doc
         #[pallet::call_index(1)]
-        #[pallet::weight({0})]
+        #[pallet::weight(<T as Config>::WeightInfo::submit_jwks_unsigned(payload.jwks.len() as u32))]
         pub fn submit_jwks_unsigned(
             origin: OriginFor<T>,
             payload: JwksPayload<T::Public, BlockNumberFor<T>>,
@@ -210,7 +215,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(254)]
-        #[pallet::weight(({0}, DispatchClass::Operational))]
+        #[pallet::weight((<T as Config>::WeightInfo::update_keys(keys.len() as u32), DispatchClass::Operational))]
         pub fn update_keys(
             origin: OriginFor<T>,
             keys: Vec<(T::Public, bool)>,
@@ -243,7 +248,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(255)]
-        #[pallet::weight(({0}, DispatchClass::Operational))]
+        #[pallet::weight((<T as Config>::WeightInfo::set_jwk(), DispatchClass::Operational))]
         pub fn set_jwk(
             origin: OriginFor<T>,
             provider: JwkProvider,

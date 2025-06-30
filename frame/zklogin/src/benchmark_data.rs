@@ -5,6 +5,7 @@ use sp_core::{U256, ed25519};
 use sp_std::{vec, vec::Vec};
 use sp_io::crypto::ed25519_generate;
 use sp_runtime::format;
+use hex;
 
 /// JWK data for benchmark testing
 pub struct BenchmarkJwks;
@@ -111,6 +112,13 @@ impl BenchmarkZkMaterial {
     /// Get the test public key hex string
     pub fn public_hex() -> &'static str {
         "fafd1d9e25a87e9652976a7bb06c2e4777c2e539d90f3ee7b6b12b9a45118a88"
+    }
+    /// Get a mock ed25519 signature for benchmarking
+    pub fn mock_sign() -> ed25519::Signature {
+        let signature_hex = Self::signature_hex();
+        let signature_bytes = hex::decode(signature_hex).expect("Invalid hex signature");
+        let signature_array: [u8; 64] = signature_bytes.try_into().expect("Invalid signature length");
+        ed25519::Signature::from_raw(signature_array)
     }
     /// Create test ZkMaterial for benchmark
     pub fn create_test_zk_material<Moment: Default + Copy + TryInto<u64> + From<u64>>() -> ZkMaterial<Moment>

@@ -113,6 +113,26 @@ impl super::Config for Test {
     type UnsignedValidator = Test;
     type Time = Timestamp;
     type MaxKeys = MaxKeys;
+    type WeightInfo = ();
+}
+
+// Default WeightInfo implementation for tests
+impl crate::weights::WeightInfo for () {
+    fn submit_zklogin_unsigned() -> frame_support::weights::Weight {
+        frame_support::weights::Weight::zero()
+    }
+    
+    fn submit_jwks_unsigned(_c: u32) -> frame_support::weights::Weight {
+        frame_support::weights::Weight::zero()
+    }
+    
+    fn update_keys(_c: u32) -> frame_support::weights::Weight {
+        frame_support::weights::Weight::zero()
+    }
+    
+    fn set_jwk() -> frame_support::weights::Weight {
+        frame_support::weights::Weight::zero()
+    }
 }
 
 fn zk_address() -> AccountId {

@@ -77,10 +77,7 @@ benchmarks! {
         );
 
         // Use provided signature for benchmark
-        let signature_hex = BenchmarkZkMaterial::signature_hex();
-        let signature_bytes = hex::decode(signature_hex).expect("Invalid hex signature");
-        let signature_array: [u8; 64] = signature_bytes.try_into().expect("Invalid signature length");
-        let raw_signature = ed25519::Signature::from_raw(signature_array);
+        let raw_signature = BenchmarkZkMaterial::mock_sign();
 
         // Use user specified public key for benchmark
         let public_hex = BenchmarkZkMaterial::public_hex();
