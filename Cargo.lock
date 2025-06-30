@@ -5290,12 +5290,16 @@ dependencies = [
 name = "pallet-zklogin"
 version = "0.1.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-executive",
  "frame-support",
  "frame-system",
+ "hex",
+ "jsonwebtoken",
  "log",
  "pallet-balances",
  "pallet-timestamp",
+ "pallet-transaction-payment",
  "parity-scale-codec",
  "primitive-zklogin",
  "scale-info",
@@ -5820,6 +5824,7 @@ dependencies = [
  "num-bigint 0.4.4",
  "parity-scale-codec",
  "poseidon-ark",
+ "rand",
  "scale-info",
  "serde",
  "serde_json",

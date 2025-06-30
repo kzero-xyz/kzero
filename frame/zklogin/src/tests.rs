@@ -133,6 +133,10 @@ impl crate::weights::WeightInfo for () {
     fn set_jwk() -> frame_support::weights::Weight {
         frame_support::weights::Weight::zero()
     }
+
+    fn test_weight_remark() -> frame_support::weights::Weight {
+        frame_support::weights::Weight::zero()
+    }
 }
 
 fn zk_address() -> AccountId {

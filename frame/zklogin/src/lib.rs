@@ -54,6 +54,7 @@ pub mod pallet {
     use frame_system::{
         offchain::{AppCrypto, SignedPayload},
         pallet_prelude::*,
+        RawOrigin,
     };
     use sp_core::crypto::AccountId32;
 
@@ -257,6 +258,18 @@ pub mod pallet {
             ensure_root(origin)?;
             let jwk = jwk::parse_jwk::<T>(&json)?;
             Self::insert_jwks(provider, vec![jwk], false)?;
+            Ok(().into())
+        }
+
+        #[cfg(feature = "runtime-benchmarks")]
+        #[pallet::call_index(100)]
+        #[pallet::weight(<T as Config>::WeightInfo::test_weight_remark())]
+        pub fn test_weight_remark(
+            origin: OriginFor<T>,
+            remark: Vec<u8>,
+        ) -> DispatchResultWithPostInfo {
+            let who = ensure_signed(origin)?;
+            frame_system::Pallet::<T>::remark(RawOrigin::Signed(who).into(), remark)?;
             Ok(().into())
         }
     }

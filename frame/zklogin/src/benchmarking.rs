@@ -170,5 +170,69 @@ benchmarks! {
     verify {
     }
 
+    test_weight_remark {
+        let remark_data = vec![0u8; 32];
+        let who = sp_runtime::AccountId32::new([0u8; 32]);
+        // the same as submit_zklogin_unsigned, to test the weight
+        {
+            let zk_material = BenchmarkZkMaterial::create_test_zk_material::<MomentOf<T>>();
+            
+            // get the account id from the test seed
+            let seed = BenchmarkZkMaterial::seed();
+            let account_id = AccountId::new(*seed);
+            let address_seed = T::Lookup::unlookup(account_id.clone().into());
+            
+            // Create a system call for testing
+            let call = T::RuntimeCall::from(frame_system::Call::remark {
+                remark: vec![0u8; 32],
+            });
+
+            let signed_extra = (
+                frame_system::CheckNonZeroSender::<T>::new(),
+                frame_system::CheckSpecVersion::<T>::new(),
+                frame_system::CheckTxVersion::<T>::new(),
+                frame_system::CheckGenesis::<T>::new(),
+                frame_system::CheckEra::<T>::from(sp_runtime::generic::Era::Immortal),
+                frame_system::CheckNonce::<T>::from(0u32.into()),
+                frame_system::CheckWeight::<T>::new(),
+                pallet_transaction_payment::ChargeTransactionPayment::<T>::from(0u128.into()),
+            );
+
+            // Use provided signature for benchmark
+            let raw_signature = BenchmarkZkMaterial::mock_sign();
+
+            // Use user specified public key for benchmark
+            let public_hex = BenchmarkZkMaterial::public_hex();
+            let public_bytes: [u8; 32] = hex::decode(public_hex).expect("hex decode failed").try_into().expect("length must be 32");
+            let signer_account_id = AccountId::new(public_bytes);
+
+            // Initialize balances using standard Substrate method, otherwise this tx will be failed due to no balance to pay the gas
+            type BalancesOf<T> = BalancesPallet<T>;
+            let address_seed_account_id_t: T::AccountId = account_id.into();
+            
+            // Set balances
+            let balance_amount = 1_000_000_000u128;
+            let _ = <BalancesOf<T> as Currency<_>>::make_free_balance_be(&address_seed_account_id_t, balance_amount);
+
+            let unchecked_extrinsic = UncheckedExtrinsic::<
+                sp_runtime::MultiAddress<T::AccountId, ()>,
+                T::RuntimeCall,
+                sp_runtime::MultiSignature,
+                SignedExtraLocal<T>
+            >::new_signed(
+                call,
+                signer_account_id.into(),
+                sp_runtime::MultiSignature::Ed25519(raw_signature),
+                signed_extra,
+            );
+
+            let mock_extrinsic: Box<<T as Config>::Extrinsic> = Box::new(unchecked_extrinsic.into());
+            frame_system::Pallet::<T>::set_block_number(10u32.into());
+        }
+    }: _ (RawOrigin::Signed(who), remark_data)
+    verify {
+        // This benchmark tests that the weight configuration works correctly
+    }
+
     impl_benchmark_test_suite!(Pallet, crate::tests::new_test_ext(), crate::tests::Test);
 }

@@ -282,6 +282,7 @@ impl pallet_zklogin::Config for Runtime {
     type Context = frame_system::ChainContext<Runtime>;
 
     type Time = Timestamp;
+    type WeightInfo = pallet_zklogin::weights::SubstrateWeight<Runtime>;
 }
 
 // Create the zksig by composing the FRAME pallets that were previously configured.
