@@ -35,6 +35,7 @@ pallet-balances = { workspace = true, default-features = false }
 
 [dev-dependencies]
 frame-executive = { workspace = true, features = ["default"] }
+frame-benchmarking = { workspace = true, features = ["std"] }
 pallet-balances = { workspace = true, features = ["default"] }
 pallet-timestamp = { workspace = true, features = ["default"] }
 primitive-zklogin = { workspace = true, features = ["default", "testing"] }
