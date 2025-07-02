@@ -260,18 +260,6 @@ pub mod pallet {
             Self::insert_jwks(provider, vec![jwk], false)?;
             Ok(().into())
         }
-
-        #[cfg(feature = "runtime-benchmarks")]
-        #[pallet::call_index(100)]
-        #[pallet::weight(<T as Config>::WeightInfo::test_weight_remark())]
-        pub fn test_weight_remark(
-            origin: OriginFor<T>,
-            remark: Vec<u8>,
-        ) -> DispatchResultWithPostInfo {
-            let who = ensure_signed(origin)?;
-            frame_system::Pallet::<T>::remark(RawOrigin::Signed(who).into(), remark)?;
-            Ok(().into())
-        }
     }
 
     // Helper functions

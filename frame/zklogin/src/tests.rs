@@ -117,11 +117,7 @@ impl super::Config for Test {
 }
 
 // Default WeightInfo implementation for tests
-impl crate::weights::WeightInfo for () {
-    fn submit_zklogin_unsigned() -> frame_support::weights::Weight {
-        frame_support::weights::Weight::zero()
-    }
-    
+impl crate::weights::WeightInfo for () { 
     fn submit_jwks_unsigned(_c: u32) -> frame_support::weights::Weight {
         frame_support::weights::Weight::zero()
     }
@@ -131,10 +127,6 @@ impl crate::weights::WeightInfo for () {
     }
     
     fn set_jwk() -> frame_support::weights::Weight {
-        frame_support::weights::Weight::zero()
-    }
-
-    fn test_weight_remark() -> frame_support::weights::Weight {
         frame_support::weights::Weight::zero()
     }
 }
