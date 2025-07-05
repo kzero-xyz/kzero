@@ -15,6 +15,7 @@ where
     <Self as Extrinsic>::SignaturePayload: SignaturePayloadExt,
 {
     fn signature_payload(&self) -> Option<&Self::SignaturePayload>;
+    fn get_call(&self) -> &Self::Call;
 }
 
 impl<Address: TypeInfo, Call: TypeInfo, Signature: TypeInfo, Extra: SignedExtension + TypeInfo>
@@ -22,6 +23,10 @@ impl<Address: TypeInfo, Call: TypeInfo, Signature: TypeInfo, Extra: SignedExtens
 {
     fn signature_payload(&self) -> Option<&Self::SignaturePayload> {
         self.signature.as_ref()
+    }
+
+    fn get_call(&self) -> &Self::Call {
+        &self.function
     }
 }
 

@@ -85,7 +85,8 @@ pub mod pallet {
             + Checkable<Self::Context, Checked = Self::CheckedExtrinsic>
             + Codec
             + TypeInfo
-            + Member;
+            + Member
+            + GetDispatchInfo;
 
         type CheckedExtrinsic: Applyable<Call = Self::RuntimeCall>
             + GetDispatchInfo
@@ -176,7 +177,10 @@ pub mod pallet {
     {
         // TODO: provide a valid weight
         #[pallet::call_index(0)]
-        #[pallet::weight({0})]
+        #[pallet::weight({
+            uxt.get_dispatch_info().weight
+            //0
+        })]
         pub fn submit_zklogin_unsigned(
             origin: OriginFor<T>,
             uxt: Box<<T as Config>::Extrinsic>,
