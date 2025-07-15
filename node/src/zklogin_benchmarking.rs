@@ -14,7 +14,7 @@ use sp_runtime::OpaqueExtrinsic;
 
 use sp_runtime::generic::Era;
 use std::{sync::Arc, time::Duration};
-use zklogin_support::test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs};
+use primitive_zklogin::test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs};
 
 /// Generates extrinsics for the `benchmark overhead` command.
 ///

@@ -117,10 +117,10 @@ pub fn run() -> sc_cli::Result<()> {
                 // which sub-commands it wants to support.
                 match cmd {
                     BenchmarkCmd::Pallet(cmd) => {
-                        if !cfg!(feature = "zksig-benchmarks") {
+                        if !cfg!(feature = "runtime-benchmarks") {
                             return Err(
                                 "Runtime benchmarking wasn't enabled when building the node. \
-							You can enable it with `--features zksig-benchmarks`."
+							You can enable it with `--features runtime-benchmarks`."
                                     .into(),
                             );
                         }

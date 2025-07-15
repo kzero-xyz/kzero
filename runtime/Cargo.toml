@@ -103,6 +103,8 @@ runtime-benchmarks = [
     "pallet-grandpa/runtime-benchmarks",
     "pallet-sudo/runtime-benchmarks",
     "pallet-timestamp/runtime-benchmarks",
+    "pallet-zklogin/runtime-benchmarks",
+
 ]
 try-runtime = [
     "sp-runtime/try-runtime",

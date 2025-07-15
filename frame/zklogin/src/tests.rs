@@ -1,9 +1,12 @@
 use crate::{Call as ZkLoginCall, Pallet};
 use frame_executive::Executive;
+use frame_support::dispatch::{DispatchInfo, GetDispatchInfo};
+use frame_support::traits::Get;
 use frame_support::{
     assert_ok, derive_impl, dispatch::RawOrigin, pallet_prelude::TypeInfo, parameter_types,
     traits::UnfilteredDispatchable,
 };
+use frame_system::weights::WeightInfo;
 use pallet_balances::Call as BalancesCall;
 use primitive_zklogin::{
     test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs, test_cases::google},
@@ -14,10 +17,14 @@ use sp_core::{ed25519, Pair};
 use sp_runtime::{
     generic,
     generic::{CheckedExtrinsic, UncheckedExtrinsic},
-    traits::{BlakeTwo256, DispatchInfoOf, IdentifyAccount, SignedExtension, Verify},
+    traits::{
+        BlakeTwo256, DispatchInfoOf, IdentifyAccount, PostDispatchInfoOf, SignedExtension, Verify,
+    },
     transaction_validity::TransactionValidityError,
-    BuildStorage, MultiAddress, MultiSignature,
+    BuildStorage, DispatchResult, MultiAddress, MultiSignature,
 };
+
+use frame_system::CheckWeight;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -51,10 +58,21 @@ impl SignedExtension for MockExtra {
         self,
         _who: &Self::AccountId,
         _call: &Self::Call,
-        _info: &DispatchInfoOf<Self::Call>,
-        _len: usize,
+        info: &DispatchInfoOf<Self::Call>,
+        len: usize,
     ) -> Result<Self::Pre, TransactionValidityError> {
+        frame_system::CheckWeight::<Test>::do_pre_dispatch(info, len)?;
         Ok(())
+    }
+
+    fn post_dispatch(
+        pre: Option<Self::Pre>,
+        info: &DispatchInfoOf<Self::Call>,
+        post_info: &PostDispatchInfoOf<Self::Call>,
+        len: usize,
+        result: &DispatchResult,
+    ) -> Result<(), TransactionValidityError> {
+        frame_system::CheckWeight::<Test>::post_dispatch(pre, info, post_info, len, result)
     }
 }
 
@@ -113,6 +131,22 @@ impl super::Config for Test {
     type UnsignedValidator = Test;
     type Time = Timestamp;
     type MaxKeys = MaxKeys;
+    type WeightInfo = ();
+}
+
+// Default WeightInfo implementation for tests
+impl crate::weights::WeightInfo for () {
+    fn submit_jwks_unsigned(_c: u32) -> frame_support::weights::Weight {
+        frame_support::weights::Weight::zero()
+    }
+
+    fn update_keys(_c: u32) -> frame_support::weights::Weight {
+        frame_support::weights::Weight::zero()
+    }
+
+    fn set_jwk() -> frame_support::weights::Weight {
+        frame_support::weights::Weight::zero()
+    }
 }
 
 fn zk_address() -> AccountId {
@@ -686,4 +720,165 @@ fn test_submit_zklogin_unsigned() {
             DispatchError::BadOrigin
         );
     });
+}
+
+#[test]
+fn should_weight_the_same() {
+    use crate::Call as ZkLoginCall;
+    use sp_core::ed25519;
+    use sp_runtime::traits::ValidateUnsigned;
+    use sp_runtime::MultiSignature;
+
+    // 1. frame_system::remark - (direct call)
+    let weight1 = {
+        new_test_ext().execute_with(|| {
+            MockExecutive::initialize_block(&header_from_number(1));
+
+            let _ = pallet_timestamp::Pallet::<Test>::set(RawOrigin::None.into(), 1);
+            let remark_bytes = b"hello, zklogin!".to_vec();
+            let call = RuntimeCall::System(frame_system::Call::remark { remark: remark_bytes });
+
+            // Directly measure the weight of a single call
+            let dispatch_info = call.get_dispatch_info();
+            let weight = dispatch_info.weight;
+
+            // Generate key pair
+            let pair: ed25519::Pair = get_test_eph_key();
+
+            let account = pair.public();
+            let address = sp_runtime::MultiAddress::Id(account.into());
+            // Sign payload (directly sign call encoding, production environment may have additional signed extensions)
+            let call_encoded = call.encode();
+            let signature = pair.sign(&call_encoded);
+            let multi_sig = MultiSignature::from(signature);
+            let remark_extrinsic =
+                MockUncheckedExtrinsic::new_signed(call.clone(), address, multi_sig, MockExtra);
+
+            // Record BlockWeight before execution
+            let block_weight_before = frame_system::BlockWeight::<Test>::get();
+
+            assert_ok!(MockExecutive::apply_extrinsic(remark_extrinsic));
+
+            let block_weight_after = frame_system::BlockWeight::<Test>::get();
+
+            // Calculate actual execution weight consumed (via BlockWeight)
+            let delta = block_weight_after.total().saturating_sub(block_weight_before.total());
+
+            // Print each component
+            let block_weights: frame_system::limits::BlockWeights =
+                <Test as frame_system::Config>::BlockWeights::get();
+            let base_extrinsic =
+                block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
+            let proof_size =
+                frame_support::weights::Weight::from_parts(0, call.encoded_size() as u64);
+            let call_weight_in_block =
+                delta.saturating_sub(base_extrinsic).saturating_sub(proof_size);
+
+            assert_eq!(
+                weight.ref_time(),
+                call_weight_in_block.ref_time(),
+                "remark call weight ref_time should be the same as the call weight in block"
+            );
+            MockExecutive::finalize_block();
+            weight
+        })
+    };
+
+    // 2. zklogin(frame_system::remark) - (wrapped by zklogin)
+    let weight2 = {
+        new_test_ext().execute_with(|| {
+            MockExecutive::initialize_block(&header_from_number(2));
+            let _ = pallet_timestamp::Pallet::<Test>::set(RawOrigin::None.into(), 1);
+            let source = sp_runtime::transaction_validity::TransactionSource::External;
+            let remark_bytes = b"hello, zklogin!".to_vec();
+            let sys_remark_call =
+                RuntimeCall::System(frame_system::Call::remark { remark: remark_bytes });
+            let (address_seed, input_data, expire_at, _) = get_raw_data();
+            let inputs = get_zklogin_inputs(input_data);
+            let provider = JwkProvider::Google;
+            let jwks = google::GOOGLE_JWK_JSON_LIST[0];
+            let kids = google::kids(true);
+            let kid = kids[0].clone();
+            let zk_material = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
+            assert_ok!(ZkLogin::set_jwk(
+                RawOrigin::Root.into(),
+                provider,
+                jwks.as_bytes().to_vec()
+            ));
+            let signing_key: ed25519::Pair = get_test_eph_key();
+            let payload = SignedPayload::new(sys_remark_call.clone(), MockExtra)
+                .expect("payload should succeed");
+            let sign = payload.using_encoded(|d| signing_key.sign(d));
+            let uxt = MockUncheckedExtrinsic::new_signed(
+                sys_remark_call.clone(),
+                AccountId::from(signing_key.public()).into(),
+                MultiSignature::from(sign),
+                MockExtra,
+            );
+            let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin_unsigned {
+                uxt: Box::new(uxt),
+                address_seed: address_seed.clone().into(),
+                zk_material,
+            };
+            let outer_uxt = UncheckedExtrinsic::<
+                MultiAddress<AccountId, ()>,
+                RuntimeCall,
+                MultiSignature,
+                MockExtra,
+            >::new_unsigned(final_call.clone().into());
+            assert_ok!(ZkLogin::set_jwk(
+                RawOrigin::Root.into(),
+                provider,
+                jwks.as_bytes().to_vec()
+            ));
+            // the eph key's expiration at 834, make sure current number is smaller.
+            System::set_block_number(10);
+            assert!(Pallet::<Test>::validate_unsigned(source, &final_call).is_ok());
+
+            // Directly measure submit_zklogin_unsigned weight
+            let dispatch_info = final_call.get_dispatch_info();
+            let weight = dispatch_info.weight;
+
+            let block_weight_before = frame_system::BlockWeight::<Test>::get();
+
+            // Record BlockWeight before execution
+            // execute through `apply_extrinsic`
+            assert_ok!(MockExecutive::apply_extrinsic(outer_uxt));
+
+            let block_weight_after = frame_system::BlockWeight::<Test>::get();
+
+            let delta = block_weight_after.total().saturating_sub(block_weight_before.total());
+
+            let block_weights: frame_system::limits::BlockWeights =
+                <Test as frame_system::Config>::BlockWeights::get();
+            let base_extrinsic =
+                block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
+            let proof_size =
+                frame_support::weights::Weight::from_parts(0, final_call.encoded_size() as u64);
+
+            let call_weight_in_block =
+                delta.saturating_sub(base_extrinsic).saturating_sub(proof_size);
+
+            assert_eq!(
+                weight.ref_time(),
+                call_weight_in_block.ref_time(),
+                "zklogin call weight ref_time should be the same as the call weight in block"
+            );
+            MockExecutive::finalize_block();
+
+            weight
+        })
+    };
+
+    assert_eq!(weight1, weight2, "remark call and zklogin call should have the same weight");
+}
+
+fn header_from_number(n: u32) -> sp_runtime::generic::Header<u32, BlakeTwo256> {
+    sp_runtime::generic::Header {
+        number: n,
+        parent_hash: Default::default(),
+        extrinsics_root: Default::default(),
+        state_root: Default::default(),
+        digest: Default::default(),
+    }
 }

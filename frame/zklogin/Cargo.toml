@@ -27,9 +27,15 @@ sp-runtime = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 # zkloign
 primitive-zklogin = { workspace = true, default-features = false }
+# benchmark
+hex = { version = "0.4.3", default-features = false }
+frame-benchmarking = { workspace = true, default-features = false }
+pallet-transaction-payment = { workspace = true }
+pallet-balances = { workspace = true, default-features = false }
 
 [dev-dependencies]
 frame-executive = { workspace = true, features = ["default"] }
+frame-benchmarking = { workspace = true, features = ["std"] }
 pallet-balances = { workspace = true, features = ["default"] }
 pallet-timestamp = { workspace = true, features = ["default"] }
 primitive-zklogin = { workspace = true, features = ["default", "testing"] }
@@ -58,6 +64,8 @@ std = [
 
 runtime-benchmarks = [
     "sp-runtime/runtime-benchmarks",
+    "primitive-zklogin/runtime-benchmarks",
+
 ]
 try-runtime = [
     "frame-support/try-runtime",

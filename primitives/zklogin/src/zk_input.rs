@@ -25,6 +25,10 @@ pub struct ZkLoginInputs {
 }
 
 impl ZkLoginInputs {
+    pub fn new(proof_points: ZkLoginProof, iss_base64_details: Claim, header: U256) -> Self {
+        Self { proof_points, iss_base64_details, header }
+    }
+
     /// Get the zk login proof.
     pub fn get_proof(&self) -> &ZkLoginProof {
         &self.proof_points
@@ -69,6 +73,12 @@ pub struct Claim {
     pub(crate) index_mod_4: u8,
 }
 
+impl Claim {
+    pub fn new(value: U256, index_mod_4: u8) -> Self {
+        Self { value, index_mod_4 }
+    }
+}
+
 /// The struct for zk login proof.
 // TODO add construct func
 #[cfg_attr(feature = "testing", derive(serde::Serialize, serde::Deserialize))]
@@ -80,6 +90,10 @@ pub struct ZkLoginProof {
 }
 
 impl ZkLoginProof {
+    pub fn new(a: CircomG1, b: CircomG2, c: CircomG1) -> Self {
+        Self { a, b, c }
+    }
+
     /// Convert the Circom G1/G2/GT to arkworks G1/G2/GT
     pub fn as_arkworks(&self) -> Proof<Bn254> {
         Proof {
