@@ -179,7 +179,7 @@ pub mod pallet {
         #[pallet::call_index(0)]
         #[pallet::weight({
             uxt.get_dispatch_info().weight
-            //0
+            // 0
         })]
         pub fn submit_zklogin_unsigned(
             origin: OriginFor<T>,
