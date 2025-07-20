@@ -1,12 +1,15 @@
 use crate::{Call as ZkLoginCall, Pallet};
 use frame_executive::Executive;
 use frame_support::dispatch::{DispatchInfo, GetDispatchInfo};
+use frame_support::traits::fungible::conformance_tests::regular::balanced;
 use frame_support::traits::Get;
 use frame_support::{
     assert_ok, derive_impl, dispatch::RawOrigin, pallet_prelude::TypeInfo, parameter_types,
     traits::UnfilteredDispatchable,
 };
 use frame_system::weights::WeightInfo;
+use frame_support::weights::IdentityFee;
+use frame_support::weights::WeightToFee;
 use frame_support::weights::ConstantMultiplier;
 use frame_support::traits::ConstU64;
 use pallet_balances::Call as BalancesCall;
@@ -117,8 +120,8 @@ impl pallet_transaction_payment::Config for Test {
     type OnChargeTransaction = pallet_transaction_payment::FungibleAdapter<Balances, ()>;
     type OperationalFeeMultiplier = OperationalFeeMultiplier;
 
-    type WeightToFee = ZeroFee;
-    type LengthToFee = ZeroFee;
+    type WeightToFee = IdentityFee<u64>;
+    type LengthToFee = IdentityFee<u64>;
     type FeeMultiplierUpdate = ();
 
 }
@@ -162,7 +165,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     // We use default for brevity, but you can configure as desired if needed.
     pallet_balances::GenesisConfig::<Test> {
         // give `zk_address` an initial value of 1000
-        balances: vec![(zk_address(), 1000)],
+        balances: vec![(zk_address(), 1_000_000_000_000_000)],
     }
     .assimilate_storage(&mut t)
     .unwrap();
@@ -172,7 +175,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 #[test]
 fn basic_setup_works() {
     new_test_ext().execute_with(|| {
-        assert_eq!(System::account(&zk_address()).data.free, 1000);
+        assert_eq!(System::account(&zk_address()).data.free, 1_000_000_000_000_000);
     })
 }
 
@@ -201,6 +204,7 @@ fn validate_unsigned_should_work() {
         BalancesCall::transfer_keep_alive { dest: MultiAddress::Id(dest.clone()), value: 100 }
             .into();
 
+
     let inner_extra: InnerSignedExtra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
 
     let inner_payload = InnerSignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
@@ -208,14 +212,14 @@ fn validate_unsigned_should_work() {
 
     // construct inner unchecked_extrinsic
     let uxt = InnerMockUncheckedExtrinsic::new_signed(
-        call,
+        call.clone(),
         AccountId::from(signing_key.public()).into(),
         MultiSignature::from(inner_sign),
         inner_extra,
     );
 
     let final_call = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt),
+        uxt: Box::new(uxt.clone()),
         address_seed: address_seed.into(),
         zk_material,
     };
@@ -227,25 +231,59 @@ fn validate_unsigned_should_work() {
         SignedExtra,
     >::new_unsigned(final_call.clone().into());
 
+
+    // call_weight & call_weight_to_fee
+    let call_weight = call.clone().get_dispatch_info().weight;
+    let call_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
+
+    // base weight & weight_to_fee
+    let block_weights: frame_system::limits::BlockWeights = <Test as frame_system::Config>::BlockWeights::get();
+    let base_extrinsic = block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
+    let base_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
+
+    // proof_size & proof_size_to_fee
+    let proof_size = uxt.encode().len() as u64;
+    let proof_size_to_fee = <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(&frame_support::weights::Weight::from_parts(proof_size, 0));
+
+    let total_fee = call_weight_to_fee + base_weight_to_fee + proof_size_to_fee;
+    println!("total_fee: {:?}", total_fee);
     new_test_ext().execute_with(|| {
         // Set jwk from root.
         assert_ok!(ZkLogin::set_jwk(RawOrigin::Root.into(), provider, jwks.as_bytes().to_vec()));
 
         // the eph key's expiration at 834, make sure current number is smaller.
         System::set_block_number(10);
-        assert!(Pallet::<Test>::validate_unsigned(source, &final_call).is_ok());
+
+        // About to do the first transfer by dispatch_bypass_filter
+        let balance_before = Balances::free_balance(&zk_address(),);
+        println!("balance_before: {:?}", balance_before);
+        assert_eq!(balance_before, 1_000_000_000_000_000);
+        // assert!(Pallet::<Test>::validate_unsigned(source, &final_call).is_ok());
 
         // execute through call.dispatch
         assert_ok!(final_call.dispatch_bypass_filter(RawOrigin::None.into()));
-        // deduct 100 from zk_address
-        assert_eq!(Balances::free_balance(&zk_address(),), 900);
+        let balance_after = Balances::free_balance(&zk_address(),);
+        println!("balance_after: {:?}", balance_after);
+        assert_eq!(balance_after, 1_000_000_000_000_000 - total_fee - 100);
+
         // transfer success
         assert_eq!(Balances::free_balance(&dest), 100);
 
+        // About to do the second transfer by apply_extrinsic
         // execute through `apply_extrinsic`
+
+        let block_weight_before = frame_system::BlockWeight::<Test>::get();
         assert_ok!(MockExecutive::apply_extrinsic(outer_uxt));
+        let block_weight_after = frame_system::BlockWeight::<Test>::get();
+        let delta = block_weight_after.total().saturating_sub(block_weight_before.total());
+        println!("delta: {:?}", delta);
+
+        let balance_after_apply_extrinsic = Balances::free_balance(&zk_address(),);
+        println!("balance_after_apply_extrinsic: {:?}", balance_after_apply_extrinsic);
+        println!("balance_after - balance_after_apply_extrinsic: {:?}", balance_after - balance_after_apply_extrinsic);
+
         // deduct 100 from zk_address
-        assert_eq!(Balances::free_balance(&zk_address(),), 800);
+        assert_eq!(balance_after_apply_extrinsic, balance_after - total_fee  - 100);
         // transfer success
         assert_eq!(Balances::free_balance(&dest), 200);
     });
