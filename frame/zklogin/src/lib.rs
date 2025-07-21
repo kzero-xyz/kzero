@@ -14,7 +14,8 @@ mod benchmark_data;
 pub mod weights;
 
 use scale_codec::{Codec, Encode};
-
+use sp_runtime::TransactionOutcome;
+use frame_support::storage::with_transaction;
 use frame_support::{
     dispatch::{
         DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo, PostDispatchInfo,
@@ -359,7 +360,14 @@ pub mod pallet {
                         .verify_zk_login(eph_pubkey, &address_seed, &jwk)
                         .map_err(|_| InvalidTransaction::BadProof)?;
 
-                    xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
+
+                    let r = with_transaction::<TransactionValidity, DispatchError, _>(|| {
+                        let result = xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len);
+                        // must rollback for any case
+                        TransactionOutcome::Rollback(Ok(result))
+                    });
+                    // discard this part
+                    r.unwrap()
                 }
                 Call::submit_jwks_unsigned { payload, signature } => {
                     let signature_valid =

@@ -272,10 +272,10 @@ impl pallet_zklogin::Config for Runtime {
 
     type MaxKeys = MaxKeys;
     type RuntimeEvent = RuntimeEvent;
-    type Extrinsic = UncheckedExtrinsic;
+    type Extrinsic = InnerUncheckedExtrinsic;
 
     type CheckedExtrinsic =
-        <UncheckedExtrinsic as sp_runtime::traits::Checkable<Self::Context>>::Checked;
+        <InnerUncheckedExtrinsic as sp_runtime::traits::Checkable<Self::Context>>::Checked;
 
     type UnsignedValidator = Runtime;
 
@@ -319,6 +319,18 @@ pub type SignedExtra = (
     pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
 );
 
+// For the inner transaction, we avoid the checkWeight, only do the charge
+// When create the innerSignedPayload, we use the innerSignedExtra(which use the chargeTransactionPayment only)
+pub type InnerSignedExtra = (
+    frame_system::CheckNonZeroSender<Runtime>,
+    frame_system::CheckSpecVersion<Runtime>,
+    frame_system::CheckTxVersion<Runtime>,
+    frame_system::CheckGenesis<Runtime>,
+    frame_system::CheckEra<Runtime>,
+    frame_system::CheckNonce<Runtime>,
+    pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+);
+
 /// All migrations of the zksig, aside from the ones declared in the pallets.
 ///
 /// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
@@ -328,8 +340,17 @@ type Migrations = ();
 /// Unchecked extrinsic type as expected by this zksig.
 pub type UncheckedExtrinsic =
     generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+
+pub type InnerUncheckedExtrinsic = 
+    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, InnerSignedExtra>;
+
 /// The payload being signed in transactions.
 pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
+
+// for inner transaction, we use the innerSignedPayload(which use the innerSignedExtra)
+pub type InnerSignedPayload = generic::SignedPayload<RuntimeCall, InnerSignedExtra>;
+
+
 /// Executive: handles dispatch to the various modules.
 pub type Executive = frame_executive::Executive<
     Runtime,

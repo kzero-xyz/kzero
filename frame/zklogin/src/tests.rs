@@ -5,7 +5,7 @@ use frame_support::traits::fungible::conformance_tests::regular::balanced;
 use frame_support::traits::Get;
 use frame_support::{
     assert_ok, derive_impl, dispatch::RawOrigin, pallet_prelude::TypeInfo, parameter_types,
-    traits::UnfilteredDispatchable,
+    traits::{Currency, UnfilteredDispatchable},
 };
 use frame_system::weights::WeightInfo;
 use frame_support::weights::IdentityFee;
@@ -38,8 +38,10 @@ type Context = frame_system::ChainContext<Test>;
 pub type Signature = MultiSignature;
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 pub type Address = MultiAddress<AccountId, ()>;
+// for inner transaction, we use the innerMockUncheckedExtrinsic & innerMockCheckedExtrinsic(which use the innerSignedPayload)
 type InnerMockUncheckedExtrinsic = UncheckedExtrinsic<Address, RuntimeCall, MultiSignature, InnerSignedExtra>;
 type InnerMockCheckedExtrinsic = CheckedExtrinsic<AccountId, RuntimeCall, InnerSignedExtra>;
+// for inner transaction, we use the innerSignedPayload(which use the innerSignedExtra)
 pub type InnerSignedPayload = generic::SignedPayload<RuntimeCall, InnerSignedExtra>;
 
 type MockUncheckedExtrinsic = UncheckedExtrinsic<Address, RuntimeCall, MultiSignature, SignedExtra>;
@@ -50,10 +52,13 @@ pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
 type Block = generic::Block<Header, MockUncheckedExtrinsic>;
 
 
+// for the outer extrinsic we apply the checkWeight
 type SignedExtra = (
     frame_system::CheckWeight<Test>,
     pallet_transaction_payment::ChargeTransactionPayment<Test>,
 );
+// but for the inner transaction, we avoid the checkWeight, only do the charge
+// when create the innerSignedPayload, we use the innerSignedExtra(which use the chargeTransactionPayment only)
 type InnerSignedExtra = (
     pallet_transaction_payment::ChargeTransactionPayment<Test>,
 ); 
@@ -246,7 +251,6 @@ fn validate_unsigned_should_work() {
     let proof_size_to_fee = <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(&frame_support::weights::Weight::from_parts(proof_size, 0));
 
     let total_fee = call_weight_to_fee + base_weight_to_fee + proof_size_to_fee;
-    println!("total_fee: {:?}", total_fee);
     new_test_ext().execute_with(|| {
         // Set jwk from root.
         assert_ok!(ZkLogin::set_jwk(RawOrigin::Root.into(), provider, jwks.as_bytes().to_vec()));
@@ -256,14 +260,12 @@ fn validate_unsigned_should_work() {
 
         // About to do the first transfer by dispatch_bypass_filter
         let balance_before = Balances::free_balance(&zk_address(),);
-        println!("balance_before: {:?}", balance_before);
         assert_eq!(balance_before, 1_000_000_000_000_000);
         // assert!(Pallet::<Test>::validate_unsigned(source, &final_call).is_ok());
 
         // execute through call.dispatch
         assert_ok!(final_call.dispatch_bypass_filter(RawOrigin::None.into()));
         let balance_after = Balances::free_balance(&zk_address(),);
-        println!("balance_after: {:?}", balance_after);
         assert_eq!(balance_after, 1_000_000_000_000_000 - total_fee - 100);
 
         // transfer success
@@ -272,15 +274,9 @@ fn validate_unsigned_should_work() {
         // About to do the second transfer by apply_extrinsic
         // execute through `apply_extrinsic`
 
-        let block_weight_before = frame_system::BlockWeight::<Test>::get();
         assert_ok!(MockExecutive::apply_extrinsic(outer_uxt));
-        let block_weight_after = frame_system::BlockWeight::<Test>::get();
-        let delta = block_weight_after.total().saturating_sub(block_weight_before.total());
-        println!("delta: {:?}", delta);
 
         let balance_after_apply_extrinsic = Balances::free_balance(&zk_address(),);
-        println!("balance_after_apply_extrinsic: {:?}", balance_after_apply_extrinsic);
-        println!("balance_after - balance_after_apply_extrinsic: {:?}", balance_after - balance_after_apply_extrinsic);
 
         // deduct 100 from zk_address
         assert_eq!(balance_after_apply_extrinsic, balance_after - total_fee  - 100);
@@ -730,16 +726,31 @@ fn test_submit_zklogin_unsigned() {
 
     // Create unchecked extrinsic
     let uxt = InnerMockUncheckedExtrinsic::new_signed(
-        call,
+        call.clone(),
         AccountId::from(signing_key.public()).into(),
         MultiSignature::from(inner_sign),
         inner_extra.clone(),
     );
     let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt),
+        uxt: Box::new(uxt.clone()),
         address_seed: address_seed.into(),
         zk_material,
     };
+
+    // call_weight & call_weight_to_fee
+    let call_weight = call.clone().get_dispatch_info().weight;
+    let call_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
+
+    // base weight & weight_to_fee
+    let block_weights: frame_system::limits::BlockWeights = <Test as frame_system::Config>::BlockWeights::get();
+    let base_extrinsic = block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
+    let base_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
+
+    // proof_size & proof_size_to_fee
+    let proof_size = uxt.encode().len() as u64;
+    let proof_size_to_fee = <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(&frame_support::weights::Weight::from_parts(proof_size, 0));
+
+    let total_fee = call_weight_to_fee + base_weight_to_fee + proof_size_to_fee;
 
     new_test_ext().execute_with(|| {
         // Set jwk from root
@@ -753,7 +764,7 @@ fn test_submit_zklogin_unsigned() {
 
         // Verify transfer was successful
         assert_eq!(Balances::free_balance(&dest), 100);
-        assert_eq!(Balances::free_balance(&zk_address()), 900);
+        assert_eq!(Balances::free_balance(&zk_address()), 1_000_000_000_000_000 - total_fee - 100);
 
         // Test invalid origin (must be None)
         assert_noop!(
@@ -783,11 +794,15 @@ fn should_weight_the_same() {
             let dispatch_info = call.get_dispatch_info();
             let weight = dispatch_info.weight;
 
-            // Generate key pair
-            let pair: ed25519::Pair = get_test_eph_key();
-
+            // Generate key pair and ensure the account has balance
+            let pair: ed25519::Pair = ed25519::Pair::from_seed(&[10u8; 32]);
             let account = pair.public();
             let address = sp_runtime::MultiAddress::Id(account.into());
+            let account_id: AccountId = account.into();
+            
+            // Give the account some balance to pay for transaction fees
+            let _ = Balances::deposit_creating(&account_id, 1_000_000_000_000_000);
+            
             // Sign payload (directly sign call encoding, production environment may have additional signed extensions)
             let extra = (frame_system::CheckWeight::new(), pallet_transaction_payment::ChargeTransactionPayment::from(0));
             let payload = SignedPayload::new(call.clone(), extra.clone()).expect("payload should succeed");
