@@ -4843,6 +4843,8 @@ dependencies = [
  "pallet-aura",
  "pallet-balances",
  "pallet-grandpa",
+ "pallet-proxy",
+ "pallet-recovery",
  "pallet-sudo",
  "pallet-timestamp",
  "pallet-transaction-payment",

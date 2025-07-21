@@ -44,7 +44,7 @@ fn main() {
         BalancesCall::transfer_keep_alive { dest: Address::Id(dest.clone()), value: 600 }.into();
 
     let genesis_block: H256 = CHAIN_GENESIS.into();
-    // we should use the 
+    // we should use the `InnerSignedExtra` to construct the inner unsigned extrinsic(which does not include `CheckWeight`)
     let inner_extra: InnerSignedExtra = (
         frame_system::CheckNonZeroSender::<Runtime>::new(),
         frame_system::CheckSpecVersion::<Runtime>::new(),

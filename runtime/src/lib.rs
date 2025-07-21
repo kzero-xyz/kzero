@@ -19,6 +19,7 @@ use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
+use scale_codec::{Decode, Encode, MaxEncodedLen};
 
 use frame_support::genesis_builder_helper::{build_state, get_preset};
 // A few exports that help ease life for downstream crates.
@@ -26,7 +27,7 @@ pub use frame_support::{
     construct_runtime, derive_impl, parameter_types,
     traits::{
         ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, Randomness,
-        StorageInfo,
+        StorageInfo, InstanceFilter
     },
     weights::{
         constants::{
@@ -46,7 +47,7 @@ use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier
 pub use pallet_zklogin::Call as ZkLoginCall;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-pub use sp_runtime::{Perbill, Permill};
+pub use sp_runtime::{Perbill, Permill, RuntimeDebug};
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -285,6 +286,125 @@ impl pallet_zklogin::Config for Runtime {
     type WeightInfo = pallet_zklogin::weights::SubstrateWeight<Runtime>;
 }
 
+pub const MILLICENTS: Balance = 1_000_000_000;
+pub const CENTS: Balance = 1_000 * MILLICENTS; // assume this is worth about a cent.
+pub const DOLLARS: Balance = 100 * CENTS;
+
+/// calculate the deposit amount for the proxy pallet
+pub const fn deposit(items: u32, bytes: u32) -> Balance {
+    items as Balance * 15 * CENTS + (bytes as Balance) * 6 * CENTS
+}
+
+parameter_types! {
+	// One storage item; key size 32, value size 8; .
+	pub const ProxyDepositBase: Balance = deposit(1, 8);
+	// Additional storage item size of 33 bytes.
+	pub const ProxyDepositFactor: Balance = deposit(0, 33);
+	pub const AnnouncementDepositBase: Balance = deposit(1, 8);
+	pub const AnnouncementDepositFactor: Balance = deposit(0, 66);
+}
+
+/// The type used to represent the kinds of proxying allowed.
+#[derive(
+	Copy,
+	Clone,
+	Eq,
+	PartialEq,
+	Ord,
+	PartialOrd,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	MaxEncodedLen,
+	scale_info::TypeInfo,
+)]
+pub enum ProxyType {
+	Any,
+	NonTransfer,
+	Governance,
+	Staking,
+}
+impl Default for ProxyType {
+	fn default() -> Self {
+		Self::Any
+	}
+}
+impl InstanceFilter<RuntimeCall> for ProxyType {
+	fn filter(&self, c: &RuntimeCall) -> bool {
+		match self {
+			ProxyType::Any => true,
+			ProxyType::NonTransfer => !matches!(
+				c,
+				RuntimeCall::Balances(..) 
+                    // Only do with the included pallets
+                    //|
+					// RuntimeCall::Assets(..) |
+					// RuntimeCall::Uniques(..) |
+					// RuntimeCall::Nfts(..) |
+					// RuntimeCall::Vesting(pallet_vesting::Call::vested_transfer { .. }) |
+					// RuntimeCall::Indices(pallet_indices::Call::transfer { .. })
+			),
+			ProxyType::Governance => {
+                // Only do with the included pallets
+                // matches!(c,
+				// RuntimeCall::Democracy(..) |
+				// 	RuntimeCall::Council(..) |
+				// 	RuntimeCall::Society(..) |
+				// 	RuntimeCall::TechnicalCommittee(..) |
+				// 	RuntimeCall::Elections(..) |
+				// 	RuntimeCall::Treasury(..))
+                false
+            },
+			ProxyType::Staking => {
+                // Only do with the included pallets
+				// matches!(c, RuntimeCall::Staking(..) | RuntimeCall::FastUnstake(..))
+                false
+			},
+		}
+	}
+	fn is_superset(&self, o: &Self) -> bool {
+		match (self, o) {
+			(x, y) if x == y => true,
+			(ProxyType::Any, _) => true,
+			(_, ProxyType::Any) => false,
+			(ProxyType::NonTransfer, _) => true,
+			_ => false,
+		}
+	}
+}
+
+impl pallet_proxy::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type Currency = Balances;
+	type ProxyType = ProxyType;
+	type ProxyDepositBase = ProxyDepositBase;
+	type ProxyDepositFactor = ProxyDepositFactor;
+	type MaxProxies = ConstU32<32>;
+	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
+	type MaxPending = ConstU32<32>;
+	type CallHasher = BlakeTwo256;
+	type AnnouncementDepositBase = AnnouncementDepositBase;
+	type AnnouncementDepositFactor = AnnouncementDepositFactor;
+}
+
+parameter_types! {
+	pub const ConfigDepositBase: Balance = 5 * DOLLARS;
+	pub const FriendDepositFactor: Balance = 50 * CENTS;
+	pub const MaxFriends: u16 = 9;
+	pub const RecoveryDeposit: Balance = 5 * DOLLARS;
+}
+
+impl pallet_recovery::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_recovery::weights::SubstrateWeight<Runtime>;
+	type RuntimeCall = RuntimeCall;
+	type Currency = Balances;
+	type ConfigDepositBase = ConfigDepositBase;
+	type FriendDepositFactor = FriendDepositFactor;
+	type MaxFriends = MaxFriends;
+	type RecoveryDeposit = RecoveryDeposit;
+}
 // Create the zksig by composing the FRAME pallets that were previously configured.
 construct_runtime!(
     pub struct Runtime {
@@ -296,7 +416,8 @@ construct_runtime!(
         TransactionPayment: pallet_transaction_payment,
 
         ZkLogin: pallet_zklogin,
-
+        Proxy: pallet_proxy,
+        Recovery: pallet_recovery,
         Sudo: pallet_sudo,
     }
 );
