@@ -23,25 +23,31 @@ cargo test validate_unsigned_should_work
 
 After successfully running the test, you should get the following result:
 ```bash
-running 16 tests
-test tests::test_parse_jwk_missing_required_fields ... ok
-test tests::test_check_jwk_not_onchain_when_different_content ... ok
+running 22 tests
 test tests::test_check_jwk_not_onchain_when_not_exists ... ok
+test tests::test_check_jwk_not_onchain_when_different_content ... ok
 test tests::test_check_jwk_not_onchain_when_same_content ... ok
 test tests::test_parse_jwk_success ... ok
 test tests::test_parse_jwk_with_google_format ... ok
-test tests::__construct_runtime_integrity_test::runtime_integrity_tests ... ok
 test tests::test_genesis_config_builds ... ok
+test tests::__construct_runtime_integrity_test::runtime_integrity_tests ... ok
+test tests::test_parse_jwk_missing_required_fields ... ok
 test tests::test_fetch_jwks ... ok
+test tests::test_set_jwk ... ok
 test tests::test_update_keys ... ok
 test tests::test_submit_jwks_unsigned ... ok
-test tests::test_set_jwk ... ok
-test tests::validate_unsigned_should_fail_when_jwk_not_match ... ok
 test tests::basic_setup_works ... ok
+test tests::validate_add_proxy_should_work ... ok
+test tests::validate_complete_recovery_flow_should_work ... ok
 test tests::test_submit_zklogin_unsigned ... ok
+test tests::validate_create_recovery_should_work ... ok
+test tests::validate_proxy_call_should_work ... ok
+test tests::validate_remove_proxy_should_work ... ok
+test tests::should_weight_the_same ... ok
+test tests::validate_unsigned_should_fail_when_jwk_not_match ... ok
 test tests::validate_unsigned_should_work ... ok
 
-test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.16s
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.04s
 
    Doc-tests pallet_zklogin
 ```

@@ -4,8 +4,9 @@ use sp_runtime::generic::Era;
 // local
 use node_template::node_template_runtime::{
     self, AccountId, Address, BalancesCall, Runtime, RuntimeCall, Signature, SignedExtra,
-    SignedPayload, UncheckedExtrinsic, ZkLoginCall,
+    InnerSignedPayload, UncheckedExtrinsic, ZkLoginCall, InnerSignedExtra, InnerUncheckedExtrinsic
 };
+use sp_runtime::traits::ValidateUnsigned;
 use primitive_zklogin::{
     test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs, test_cases::google},
     JwkProvider, ZkMaterialV1
@@ -43,19 +44,19 @@ fn main() {
         BalancesCall::transfer_keep_alive { dest: Address::Id(dest.clone()), value: 600 }.into();
 
     let genesis_block: H256 = CHAIN_GENESIS.into();
-    let extra: SignedExtra = (
+    // we should use the `InnerSignedExtra` to construct the inner unsigned extrinsic(which does not include `CheckWeight`)
+    let inner_extra: InnerSignedExtra = (
         frame_system::CheckNonZeroSender::<Runtime>::new(),
         frame_system::CheckSpecVersion::<Runtime>::new(),
         frame_system::CheckTxVersion::<Runtime>::new(),
         frame_system::CheckGenesis::<Runtime>::new(),
         frame_system::CheckEra::<Runtime>::from(Era::Immortal),
         frame_system::CheckNonce::<Runtime>::from(0),
-        frame_system::CheckWeight::<Runtime>::new(),
         pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(0),
     );
-    let payload = SignedPayload::from_raw(
+    let payload = InnerSignedPayload::from_raw(
         call.clone(),
-        extra.clone(),
+        inner_extra.clone(),
         (
             (),
             node_template_runtime::VERSION.spec_version,
@@ -65,16 +66,15 @@ fn main() {
             genesis_block,
             (),
             (),
-            (),
         ),
     );
     let sign = payload.using_encoded(|d| signing_key.sign(d));
     // construct inner unchecked_extrinsic
-    let uxt = UncheckedExtrinsic::new_signed(
+    let uxt = InnerUncheckedExtrinsic::new_signed(
         call,
         AccountId::from(signing_key.public()).into(),
         Signature::from(sign),
-        extra,
+        inner_extra,
     );
 
     println!("inner tx\n0x{}", hex::encode(uxt.encode()));
@@ -90,4 +90,5 @@ fn main() {
     let outer_utx = UncheckedExtrinsic::new_unsigned(final_call);
 
     println!("outer tx\n0x{}", hex::encode(outer_utx.encode()))
+
 }

@@ -29,7 +29,6 @@ sp-std = { workspace = true, default-features = false }
 primitive-zklogin = { workspace = true, default-features = false }
 # benchmark
 hex = { version = "0.4.3", default-features = false }
-frame-benchmarking = { workspace = true, default-features = false }
 pallet-transaction-payment = { workspace = true }
 pallet-balances = { workspace = true, default-features = false }
 
@@ -40,6 +39,8 @@ pallet-balances = { workspace = true, features = ["default"] }
 pallet-timestamp = { workspace = true, features = ["default"] }
 primitive-zklogin = { workspace = true, features = ["default", "testing"] }
 jsonwebtoken = { workspace = true }
+pallet-proxy = { workspace = true, features = ["default"] }
+pallet-recovery = { workspace = true, features = ["default"] }
 
 [features]
 default = ["std"]
