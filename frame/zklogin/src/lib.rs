@@ -5,8 +5,17 @@ mod offchain_worker;
 #[cfg(test)]
 mod tests;
 
-use scale_codec::{Codec, Encode};
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmark_data;
+
+pub mod weights;
+
+use scale_codec::{Codec, Encode};
+use sp_runtime::TransactionOutcome;
+use frame_support::storage::with_transaction;
 use frame_support::{
     dispatch::{
         DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo, PostDispatchInfo,
@@ -29,6 +38,7 @@ use primitive_zklogin::{
 use crate::offchain_worker::JwksPayload;
 // re-export
 pub use crate::offchain_worker::crypto;
+pub use weights::WeightInfo;
 
 type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
@@ -45,6 +55,7 @@ pub mod pallet {
     use frame_system::{
         offchain::{AppCrypto, SignedPayload},
         pallet_prelude::*,
+        RawOrigin,
     };
     use sp_core::crypto::AccountId32;
 
@@ -75,7 +86,8 @@ pub mod pallet {
             + Checkable<Self::Context, Checked = Self::CheckedExtrinsic>
             + Codec
             + TypeInfo
-            + Member;
+            + Member
+            + GetDispatchInfo;
 
         type CheckedExtrinsic: Applyable<Call = Self::RuntimeCall>
             + GetDispatchInfo
@@ -85,6 +97,9 @@ pub mod pallet {
         type UnsignedValidator: ValidateUnsigned<Call = Self::RuntimeCall>;
 
         type Time: Time;
+
+        /// Weight information for extrinsics in this pallet.
+        type WeightInfo: WeightInfo;
     }
 
     #[pallet::event]
@@ -163,7 +178,10 @@ pub mod pallet {
     {
         // TODO: provide a valid weight
         #[pallet::call_index(0)]
-        #[pallet::weight({0})]
+        #[pallet::weight({
+            uxt.get_dispatch_info().weight
+            // 0
+        })]
         pub fn submit_zklogin_unsigned(
             origin: OriginFor<T>,
             uxt: Box<<T as Config>::Extrinsic>,
@@ -187,7 +205,7 @@ pub mod pallet {
 
         /// TODO doc
         #[pallet::call_index(1)]
-        #[pallet::weight({0})]
+        #[pallet::weight(<T as Config>::WeightInfo::submit_jwks_unsigned(payload.jwks.len() as u32))]
         pub fn submit_jwks_unsigned(
             origin: OriginFor<T>,
             payload: JwksPayload<T::Public, BlockNumberFor<T>>,
@@ -203,7 +221,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(254)]
-        #[pallet::weight(({0}, DispatchClass::Operational))]
+        #[pallet::weight((<T as Config>::WeightInfo::update_keys(keys.len() as u32), DispatchClass::Operational))]
         pub fn update_keys(
             origin: OriginFor<T>,
             keys: Vec<(T::Public, bool)>,
@@ -236,7 +254,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(255)]
-        #[pallet::weight(({0}, DispatchClass::Operational))]
+        #[pallet::weight((<T as Config>::WeightInfo::set_jwk(), DispatchClass::Operational))]
         pub fn set_jwk(
             origin: OriginFor<T>,
             provider: JwkProvider,
@@ -342,7 +360,14 @@ pub mod pallet {
                         .verify_zk_login(eph_pubkey, &address_seed, &jwk)
                         .map_err(|_| InvalidTransaction::BadProof)?;
 
-                    xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len)
+
+                    let r = with_transaction::<TransactionValidity, DispatchError, _>(|| {
+                        let result = xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len);
+                        // must rollback for any case
+                        TransactionOutcome::Rollback(Ok(result))
+                    });
+                    // discard this part
+                    r.unwrap()
                 }
                 Call::submit_jwks_unsigned { payload, signature } => {
                     let signature_valid =

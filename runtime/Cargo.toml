@@ -46,6 +46,9 @@ pallet-transaction-payment = { workspace = true }
 pallet-transaction-payment-rpc-runtime-api = { workspace = true }
 # local pallets
 pallet-zklogin = { workspace = true }
+# recovery pallets
+pallet-proxy =  { workspace = true }
+pallet-recovery =  { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder = { workspace = true, optional = true }
@@ -103,6 +106,8 @@ runtime-benchmarks = [
     "pallet-grandpa/runtime-benchmarks",
     "pallet-sudo/runtime-benchmarks",
     "pallet-timestamp/runtime-benchmarks",
+    "pallet-zklogin/runtime-benchmarks",
+
 ]
 try-runtime = [
     "sp-runtime/try-runtime",
