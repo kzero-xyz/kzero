@@ -20,7 +20,8 @@ base64ct = { version = "1.5.3", features = ["alloc"] }
 ark-bn254 = { version = "0.4.0", default-features = false, features = ["curve"] }
 ark-crypto-primitives = { version = "=0.4.0", default-features = false }
 ark-ff = { version = "0.4.1", default-features = false, features = ["asm"] }
-ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", default-features = false }
+# ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", default-features = false }
+ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", rev = "42b38f1675fd45aa4429a2d335653e37507ec95c", default-features = false }
 ark-relations = { version = "0.4.0", default-features = false }
 ff = { version = "0.13.0", default-features = false, features = ["derive"] }
 num-bigint = { version = "0.4.4", default-features = false }
