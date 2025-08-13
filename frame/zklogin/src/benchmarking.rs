@@ -4,34 +4,15 @@ use super::*;
 use frame_benchmarking::benchmarks;
 use frame_system::{pallet_prelude::BlockNumberFor, RawOrigin};
 use primitive_zklogin::traits::{SignaturePayloadExt, TryIntoEphPubKey};
-use sp_core::ed25519;
 use sp_io::crypto::ed25519_generate;
 use sp_runtime::traits::Dispatchable;
-use frame_support::pallet_prelude::ValidateUnsigned;
-use frame_support::assert_ok;
 use sp_runtime::MultiSignature;
-use sp_runtime::generic::UncheckedExtrinsic;
-use hex;
-use frame_support::traits::Currency;
-use pallet_balances::Pallet as BalancesPallet;
-use crate::Pallet as ZKLogin;
 
 // Import benchmark data
 use crate::benchmark_data::{BenchmarkJwks, BenchmarkKeys};
 
 // Type definitions
 type AccountId = <<MultiSignature as sp_runtime::traits::Verify>::Signer as sp_runtime::traits::IdentifyAccount>::AccountId;
-
-type SignedExtraLocal<T> = (
-    frame_system::CheckNonZeroSender<T>,
-    frame_system::CheckSpecVersion<T>,
-    frame_system::CheckTxVersion<T>,
-    frame_system::CheckGenesis<T>,
-    frame_system::CheckEra<T>,
-    frame_system::CheckNonce<T>,
-    frame_system::CheckWeight<T>,
-    pallet_transaction_payment::ChargeTransactionPayment<T>,
-);
 
 benchmarks! {
     where_clause {
@@ -42,7 +23,6 @@ benchmarks! {
         u64: From<MomentOf<T>>,
         sp_runtime::MultiAddress<T::AccountId, ()>: From<sp_runtime::AccountId32>,
         <<T as pallet_transaction_payment::Config>::OnChargeTransaction as pallet_transaction_payment::OnChargeTransaction<T>>::Balance: From<u128> + From<u64>,
-        <T as pallet::Config>::Extrinsic: From<UncheckedExtrinsic<sp_runtime::MultiAddress<T::AccountId, ()>, T::RuntimeCall, sp_runtime::MultiSignature, SignedExtraLocal<T>>>,
         T::RuntimeCall: Dispatchable<Info = frame_support::dispatch::DispatchInfo, PostInfo = frame_support::dispatch::PostDispatchInfo>,
         <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
         <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
@@ -55,7 +35,6 @@ benchmarks! {
     submit_jwks_unsigned {
         let c in 0 .. 10;
         use crate::JwksPayload;
-        use primitive_zklogin::JwkProvider;
 
         let public = ed25519_generate(0.into(), None);
 
