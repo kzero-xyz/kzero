@@ -327,7 +327,7 @@ dependencies = [
 [[package]]
 name = "ark-groth16"
 version = "0.4.0"
-source = "git+https://github.com/arkworks-rs/groth16#42b38f1675fd45aa4429a2d335653e37507ec95c"
+source = "git+https://github.com/arkworks-rs/groth16?rev=42b38f1675fd45aa4429a2d335653e37507ec95c#42b38f1675fd45aa4429a2d335653e37507ec95c"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ec",
