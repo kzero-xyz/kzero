@@ -1,11 +1,10 @@
 #![cfg(feature = "runtime-benchmarks")]
 
-use primitive_zklogin::{Jwk, JwkProvider, ZkMaterial, ZkMaterialV1, ZkLoginInputs, ZkLoginProof, Claim, BigNumber};
-use sp_core::{U256, ed25519};
+use primitive_zklogin::{Jwk, JwkProvider};
+use sp_core::ed25519;
 use sp_std::{vec, vec::Vec};
 use sp_io::crypto::ed25519_generate;
 use sp_runtime::format;
-use hex;
 
 /// JWK data for benchmark testing
 pub struct BenchmarkJwks;
