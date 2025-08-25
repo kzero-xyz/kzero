@@ -5,7 +5,7 @@ use crate::test_helper::test_cases::poseidon_hash::{
 use crate::test_helper::test_cases::valid_affine::{
     E, INVALID_TYPE_VALUES, INVALID_VALUES, VK_ALPHA_1, VK_BETA_2, VK_DELTA_2, VK_GAMMA_2,
 };
-use crate::traits::{ExtrinsicExt, ReplaceSender, SignaturePayloadExt, TryIntoEphPubKey};
+use crate::traits::{ReplaceSender, TryIntoEphPubKey};
 use crate::{
     circom::{
         unsafe_g1_affine_from_str_projective, unsafe_g2_affine_from_str_projective, StrCircomG1,
@@ -18,8 +18,6 @@ use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use num_bigint::BigUint;
 use rand;
-use sp_runtime::traits::Clear;
-use std::str::FromStr;
 
 // ================================ Test cases for affine points on the curve ================================
 #[test]
