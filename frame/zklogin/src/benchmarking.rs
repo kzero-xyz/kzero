@@ -5,8 +5,7 @@ use frame_benchmarking::benchmarks;
 use frame_system::{pallet_prelude::BlockNumberFor, RawOrigin};
 use primitive_zklogin::traits::{SignaturePayloadExt, TryIntoEphPubKey};
 use sp_io::crypto::ed25519_generate;
-use sp_runtime::traits::Dispatchable;
-use sp_runtime::MultiSignature;
+use sp_runtime::{traits::Dispatchable, MultiSignature};
 
 // Import benchmark data
 use crate::benchmark_data::{BenchmarkJwks, BenchmarkKeys};

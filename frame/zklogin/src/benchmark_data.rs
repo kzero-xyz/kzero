@@ -2,9 +2,9 @@
 
 use primitive_zklogin::{Jwk, JwkProvider};
 use sp_core::ed25519;
-use sp_std::{vec, vec::Vec};
 use sp_io::crypto::ed25519_generate;
 use sp_runtime::format;
+use sp_std::{vec, vec::Vec};
 
 /// JWK data for benchmark testing
 pub struct BenchmarkJwks;
@@ -29,33 +29,39 @@ impl BenchmarkJwks {
     /// Generate test JWKs for submit_jwks_unsigned benchmark with specified count
     pub fn generate_test_jwks(count: u32) -> Vec<(JwkProvider, Vec<Jwk>)> {
         let mut jwks = Vec::new();
-        
+
         for i in 0..count {
             let provider = if i % 2 == 0 { JwkProvider::Google } else { JwkProvider::Apple };
-            
+
             // Create different JWK content for each iteration
             let jwk_json = if i % 2 == 0 {
-                format!(r#"{{
+                format!(
+                    r#"{{
                     "kty": "RSA",
                     "e": "AQAB",
                     "kid": "test_google_kid_{}",
                     "n": "test_google_n_value_{}",
                     "alg": "RS256"
-                }}"#, i, i)
+                }}"#,
+                    i, i
+                )
             } else {
-                format!(r#"{{
+                format!(
+                    r#"{{
                     "kty": "RSA",
                     "n": "test_apple_n_value_{}",
                     "kid": "test_apple_kid_{}",
                     "e": "AQAB",
                     "alg": "RS256"
-                }}"#, i, i)
+                }}"#,
+                    i, i
+                )
             };
-            
+
             let jwk: Jwk = serde_json::from_str(&jwk_json).expect("Failed to parse test JWK");
             jwks.push((provider, vec![jwk]));
         }
-        
+
         jwks
     }
 }
@@ -82,13 +88,13 @@ impl BenchmarkKeys {
     {
         let seeds = Self::key_seeds();
         let mut keys = Vec::new();
-        
+
         for i in 0..count {
             let seed = seeds[i as usize];
             let key = ed25519_generate(seed.into(), None);
             keys.push((T::Public::from(key), true));
         }
-        
+
         keys
     }
 }
