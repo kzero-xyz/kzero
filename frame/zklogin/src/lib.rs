@@ -19,7 +19,7 @@ use scale_info::TypeInfo;
 
 use frame_support::{
     dispatch::{
-        DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo,
+        DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo, PostDispatchInfo,
     },
     traits::{Time, IsSubType},
     RuntimeDebugNoBound,
@@ -83,7 +83,7 @@ pub mod pallet {
         /// The maximum number of keys that can be added.
         type MaxKeys: Get<u32>;
         /// Same as `Executive`
-        type UnsignedValidator: ValidateUnsigned<Call = Self::RuntimeCall>;
+        type UnsignedValidator: ValidateUnsigned<Call = <Self as Config>::RuntimeCall>;
 
         type Time: Time;
 
@@ -433,16 +433,16 @@ pub enum Val {
     Refund(Weight),
 }
 
-#[derive(Encode, Decode, Clone, Eq, PartialEq, TypeInfo)]
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, Eq, PartialEq, TypeInfo, Debug)]
 #[scale_info(skip_type_params(T))]
 pub struct ZkLoginExtension<T: Config + Send + Sync> {
     _phantom: core::marker::PhantomData<T>,
 }
 
-impl<T: Config + Send + Sync> TransactionExtension<T::RuntimeCall> for ZkLoginExtension<T>
+impl<T: Config + Send + Sync + core::fmt::Debug> TransactionExtension<<T as Config>::RuntimeCall> for ZkLoginExtension<T>
 where
-    T::RuntimeCall: Dispatchable<Info = DispatchInfo>,
-    <T::RuntimeCall as Dispatchable>::RuntimeOrigin: AsSystemOriginSigner<T::AccountId> + Clone,
+    <T as Config>::RuntimeCall: Dispatchable<Info = DispatchInfo> + IsSubType<Call<T>>,
+    <<T as Config>::RuntimeCall as Dispatchable>::RuntimeOrigin: AsSystemOriginSigner<T::AccountId> + Clone,
     // TODO assume AccountId32 limit can be removed after checking zk logic
     T: frame_system::Config<AccountId = sp_core::crypto::AccountId32>,
 {
@@ -454,22 +454,22 @@ where
 
     type Pre = Val;
 
-    fn weight(&self, call: &T::RuntimeCall) -> Weight {
+    fn weight(&self, call: &<T as Config>::RuntimeCall) -> Weight {
         // TODO change weight value to a proper one, banchmarks for calculate the validation of zk proof
         Weight::from_parts(1_000, 0)
     }
 
     fn validate(
         &self,
-        origin: <T::RuntimeCall as Dispatchable>::RuntimeOrigin,
-        call: &T::RuntimeCall,
-        info: &DispatchInfoOf<T::RuntimeCall>,
+        origin: <<T as Config>::RuntimeCall as Dispatchable>::RuntimeOrigin,
+        call: &<T as Config>::RuntimeCall,
+        info: &DispatchInfoOf<<T as Config>::RuntimeCall>,
         len: usize,
         self_implicit: Self::Implicit,
         inherited_implication: &impl sp_runtime::traits::Implication,
-        source: frame_support::pallet_prelude::TransactionSource,
-    ) -> sp_runtime::traits::ValidateResult<Self::Val, T::RuntimeCall> {
-        match call.is_sub_type().as_ref() {
+        _source: frame_support::pallet_prelude::TransactionSource,
+    ) -> sp_runtime::traits::ValidateResult<Self::Val, <T as Config>::RuntimeCall> {
+        match <<T as Config>::RuntimeCall as IsSubType<Call<T>>>::is_sub_type(call) {
             Some(Call::submit_zklogin { address_seed, zk_material, .. }) => {
                 // TODO not decide whether we need to limit call type.
                 //     // Check dispatch_class: mandatory extrinsic is not allowed to use zklogin
@@ -501,7 +501,7 @@ where
 
 
                 // TODO only support accountid: accountid32 now.
-                let zk_account: T::AccountId = address_seed.clone().into_account();
+                let zk_account: T::AccountId = sp_core::crypto::AccountId32::from(address_seed.0);
                 Ok((ValidTransaction::default(), Val::Checked, RawOrigin::Signed(zk_account).into()))
             }
             _ => Ok((ValidTransaction::default(),Val::Refund(self.weight(call)), origin)),
@@ -511,9 +511,9 @@ where
     fn prepare(
         self,
         val: Self::Val,
-        _origin: &<T::RuntimeCall as Dispatchable>::RuntimeOrigin,
-        _call: &T::RuntimeCall,
-        _info: &DispatchInfoOf<T::RuntimeCall>,
+        _origin: &<<T as Config>::RuntimeCall as Dispatchable>::RuntimeOrigin,
+        _call: &<T as Config>::RuntimeCall,
+        _info: &DispatchInfoOf<<T as Config>::RuntimeCall>,
         _len: usize,
     ) -> Result<Self::Pre, TransactionValidityError> {
         Ok(val)
@@ -522,7 +522,7 @@ where
     fn post_dispatch_details(
         pre: Self::Pre,
         _info: &DispatchInfo,
-        _post_info: &PostDispatchInfoOf<T::RuntimeCall>,
+        _post_info: &PostDispatchInfoOf<<T as Config>::RuntimeCall>,
         _len: usize,
         _result: &DispatchResult,
     ) -> Result<Weight, TransactionValidityError> {
