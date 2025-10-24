@@ -15,7 +15,7 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_core::{crypto::AccountId32, U256};
+use sp_core::{H256, U256};
 use sp_std::vec::Vec;
 
 pub use error::{ZkAuthError, ZkAuthResult};
@@ -215,7 +215,7 @@ impl<Moment: Copy + TryInto<u64>> VersionedZkMaterial<Moment> {
     pub fn verify_zk_login(
         &self,
         eph_pubkey: EphPubKey,
-        address_seed: &AccountId32,
+        address_seed: &H256,
         jwk: &Jwk,
     ) -> ZkAuthResult<()> {
         match self {
@@ -274,7 +274,7 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterialV1<Moment> {
     pub fn verify_zk_login(
         &self,
         eph_pubkey: EphPubKey,
-        address_seed: &AccountId32,
+        address_seed: &H256,
         jwk: &Jwk,
     ) -> ZkAuthResult<()> {
         let modulus = if let AlgorithmParameters::RSA(ref key_params) = jwk.algorithm {
