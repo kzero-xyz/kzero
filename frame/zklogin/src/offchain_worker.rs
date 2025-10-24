@@ -1,22 +1,17 @@
 use scale_codec::{Decode, Encode};
 // Substrate
-use frame_support::dispatch::{DispatchInfo, PostDispatchInfo};
 use frame_system::{
     offchain::{AppCrypto, SendUnsignedTransaction, SignedPayload, Signer, SigningTypes},
     pallet_prelude::BlockNumberFor,
 };
 use sp_runtime::{
     offchain::{http, Duration},
-    traits::{Dispatchable, Extrinsic, SignaturePayload},
     RuntimeAppPublic,
 };
 use sp_std::vec::Vec;
 // zklogin and local
 use crate::{Call, Config, Jwks, Keys};
-use primitive_zklogin::{
-    traits::{SignaturePayloadExt, TryIntoEphPubKey},
-    Jwk, JwkProvider, JwkProviderErr,
-};
+use primitive_zklogin::{Jwk, JwkProvider, JwkProviderErr};
 
 const TARGET: &str = "offchain-worker::zklogin";
 
@@ -65,12 +60,7 @@ type RuntimeAppPublicOf<T> = <<T as Config>::AuthorityId as AppCrypto<
     <T as SigningTypes>::Signature,
 >>::RuntimeAppPublic;
 
-fn readable_key_type<T: Config>(id: &sp_core::crypto::KeyTypeId) -> &str
-where
-    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-    <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
-{
+fn readable_key_type<T: Config>(id: &sp_core::crypto::KeyTypeId) -> &str {
     sp_std::str::from_utf8(id.0.as_slice()).unwrap_or("<invalid>")
 }
 
@@ -98,19 +88,14 @@ pub(crate) fn check_jwk_not_onchain(
     })
 }
 
-pub fn offchain_worker_entrypoint<T: Config>(block_number: BlockNumberFor<T>)
-where
-    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-    <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
-{
+pub fn offchain_worker_entrypoint<T: Config>(block_number: BlockNumberFor<T>) {
     log::debug!(target: TARGET, "ZkLogin offchain worker. number: {:?}", block_number);
 
     let onchain_keys = Keys::<T>::get().into_inner();
     let signer = Signer::<T, T::AuthorityId>::all_accounts().with_filter(onchain_keys);
     if !signer.can_sign() {
         log::debug!(target: TARGET, "This node does not have the key for KeyType: [{}], exit ZkLogin offchain worker", readable_key_type::<T>(&RuntimeAppPublicOf::<T>::ID));
-        return
+        return;
     }
 
     let all_jwks = fetch_jwks();
@@ -130,7 +115,7 @@ where
 
     if prepared_jwks.is_empty() {
         log::info!(target: TARGET, "All Jwks has not updated yet. Ignore to submit extrinsic.");
-        return
+        return;
     }
 
     match submit_unsigned::<T>(block_number, prepared_jwks) {
@@ -161,12 +146,7 @@ impl<T: SigningTypes> SignedPayload<T> for JwksPayload<T::Public, BlockNumberFor
 fn submit_unsigned<T: Config>(
     block_number: BlockNumberFor<T>,
     jwks: Vec<(JwkProvider, Vec<Jwk>)>,
-) -> Result<(), &'static str>
-where
-    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-    <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
-{
+) -> Result<(), &'static str> {
     // -- Sign using any account
     let (_, result) = Signer::<T, T::AuthorityId>::any_account()
         .send_unsigned_transaction(
@@ -208,7 +188,7 @@ pub(crate) fn fetch_jwks() -> Vec<(JwkProvider, Vec<Jwk>)> {
                     JwkProviderErr::InvalidJwks(_obj) => {}
                 }
                 log::error!(target: TARGET, "Failed to fetch Jwks for this provider: {:?}", provider);
-                continue
+                continue;
             }
         };
     }
@@ -222,7 +202,7 @@ fn fetch(url: &str) -> Result<Vec<u8>, http::Error> {
     let response = pending.try_wait(deadline).map_err(|_| http::Error::DeadlineReached)??;
     if response.code != 200 {
         log::warn!(target: TARGET, "When try to call {} meet an unexpected status code: {}", url, response.code);
-        return Err(http::Error::Unknown)
+        return Err(http::Error::Unknown);
     }
 
     Ok(response.body().collect::<Vec<u8>>())

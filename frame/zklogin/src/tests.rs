@@ -1,12 +1,14 @@
 use crate::{Call as ZkLoginCall, Pallet};
 use frame_executive::Executive;
-use frame_support::{
-    assert_ok, derive_impl, dispatch::RawOrigin, parameter_types,
-    traits::{Currency, UnfilteredDispatchable, Get},
-    dispatch::GetDispatchInfo,
-};
 use frame_support::weights::IdentityFee;
 use frame_support::weights::WeightToFee;
+use frame_support::{
+    assert_ok, derive_impl,
+    dispatch::GetDispatchInfo,
+    dispatch::RawOrigin,
+    parameter_types,
+    traits::{Currency, Get, UnfilteredDispatchable},
+};
 use pallet_balances::Call as BalancesCall;
 use primitive_zklogin::{
     test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs, test_cases::google},
@@ -29,7 +31,8 @@ pub type Signature = MultiSignature;
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 pub type Address = MultiAddress<AccountId, ()>;
 // for inner transaction, we use the innerMockUncheckedExtrinsic & innerMockCheckedExtrinsic(which use the innerSignedPayload)
-type InnerMockUncheckedExtrinsic = UncheckedExtrinsic<Address, RuntimeCall, MultiSignature, InnerSignedExtra>;
+type InnerMockUncheckedExtrinsic =
+    UncheckedExtrinsic<Address, RuntimeCall, MultiSignature, InnerSignedExtra>;
 type InnerMockCheckedExtrinsic = CheckedExtrinsic<AccountId, RuntimeCall, InnerSignedExtra>;
 // for inner transaction, we use the innerSignedPayload(which use the innerSignedExtra)
 pub type InnerSignedPayload = generic::SignedPayload<RuntimeCall, InnerSignedExtra>;
@@ -42,15 +45,11 @@ pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
 type Block = generic::Block<Header, MockUncheckedExtrinsic>;
 
 // for the outer extrinsic we apply the checkWeight
-type SignedExtra = (
-    frame_system::CheckWeight<Test>,
-    pallet_transaction_payment::ChargeTransactionPayment<Test>,
-);
+type SignedExtra =
+    (frame_system::CheckWeight<Test>, pallet_transaction_payment::ChargeTransactionPayment<Test>);
 // but for the inner transaction, we avoid the checkWeight, only do the charge
 // when create the innerSignedPayload, we use the innerSignedExtra(which use the chargeTransactionPayment only)
-type InnerSignedExtra = (
-    pallet_transaction_payment::ChargeTransactionPayment<Test>,
-); 
+type InnerSignedExtra = (pallet_transaction_payment::ChargeTransactionPayment<Test>,);
 
 type MockExecutive = Executive<Test, Block, Context, Test, AllPalletsWithSystem, ()>;
 
@@ -229,8 +228,10 @@ fn validate_unsigned_should_work() {
             .into();
 
     // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-    let inner_extra: InnerSignedExtra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
+    let inner_extra: InnerSignedExtra =
+        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
+    let inner_payload =
+        InnerSignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
     let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
 
     // construct inner unchecked_extrinsic
@@ -257,16 +258,23 @@ fn validate_unsigned_should_work() {
 
     // calculate the call_weight & call_weight_to_fee
     let call_weight = call.clone().get_dispatch_info().weight;
-    let call_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
+    let call_weight_to_fee =
+        <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
 
     // calculate the base weight & weight_to_fee
-    let block_weights: frame_system::limits::BlockWeights = <Test as frame_system::Config>::BlockWeights::get();
-    let base_extrinsic = block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
-    let base_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
+    let block_weights: frame_system::limits::BlockWeights =
+        <Test as frame_system::Config>::BlockWeights::get();
+    let base_extrinsic =
+        block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
+    let base_weight_to_fee =
+        <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
 
     // calculate the proof_size & proof_size_to_fee
     let proof_size = uxt.encode().len() as u64;
-    let proof_size_to_fee = <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(&frame_support::weights::Weight::from_parts(proof_size, 0));
+    let proof_size_to_fee =
+        <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(
+            &frame_support::weights::Weight::from_parts(proof_size, 0),
+        );
 
     // calculate `the total fee` = `call_weight_to_fee` + `base_weight_to_fee` + `proof_size_to_fee`
     let total_fee = call_weight_to_fee + base_weight_to_fee + proof_size_to_fee;
@@ -279,7 +287,7 @@ fn validate_unsigned_should_work() {
         System::set_block_number(10);
 
         // check the balance of zk_address before the transfer
-        let balance_before = Balances::free_balance(&zk_address(),);
+        let balance_before = Balances::free_balance(&zk_address());
         assert_eq!(balance_before, INIT_BALANCE);
 
         // validate the unsigned extrinsic
@@ -287,7 +295,7 @@ fn validate_unsigned_should_work() {
 
         // execute through call.dispatch
         assert_ok!(final_call.dispatch_bypass_filter(RawOrigin::None.into()));
-        let balance_after = Balances::free_balance(&zk_address(),);
+        let balance_after = Balances::free_balance(&zk_address());
 
         // check the balance of zk_address after the transfer (should deduct the `fee` and `the transfer amount``)
         assert_eq!(balance_after, INIT_BALANCE - total_fee - 100);
@@ -299,11 +307,11 @@ fn validate_unsigned_should_work() {
         // execute through `apply_extrinsic`
         assert_ok!(MockExecutive::apply_extrinsic(outer_uxt));
 
-        let balance_after_apply_extrinsic = Balances::free_balance(&zk_address(),);
+        let balance_after_apply_extrinsic = Balances::free_balance(&zk_address());
 
         // check the balance of zk_address after the transfer (should deduct the `fee` and `the transfer amount``)
-        assert_eq!(balance_after_apply_extrinsic, balance_after - total_fee  - 100);
-        
+        assert_eq!(balance_after_apply_extrinsic, balance_after - total_fee - 100);
+
         // transfer success, check the balance of the destination account should be 200(two times of the transfer)
         assert_eq!(Balances::free_balance(&dest), 200);
     });
@@ -334,7 +342,8 @@ fn validate_unsigned_should_fail_when_jwk_not_match() {
             .into();
 
     let inner_extra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
+    let inner_payload =
+        InnerSignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
     let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
 
     // construct inner unchecked_extrinsic
@@ -745,7 +754,8 @@ fn test_submit_zklogin_unsigned() {
     // Create signed payload
     let signing_key: ed25519::Pair = get_test_eph_key();
     let inner_extra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
+    let inner_payload =
+        InnerSignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
     let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
 
     // Create unchecked extrinsic
@@ -763,16 +773,23 @@ fn test_submit_zklogin_unsigned() {
 
     // call_weight & call_weight_to_fee
     let call_weight = call.clone().get_dispatch_info().weight;
-    let call_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
+    let call_weight_to_fee =
+        <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
 
     // base weight & weight_to_fee
-    let block_weights: frame_system::limits::BlockWeights = <Test as frame_system::Config>::BlockWeights::get();
-    let base_extrinsic = block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
-    let base_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
+    let block_weights: frame_system::limits::BlockWeights =
+        <Test as frame_system::Config>::BlockWeights::get();
+    let base_extrinsic =
+        block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
+    let base_weight_to_fee =
+        <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
 
     // proof_size & proof_size_to_fee
     let proof_size = uxt.clone().encode().len() as u64;
-    let proof_size_to_fee = <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(&frame_support::weights::Weight::from_parts(proof_size, 0));
+    let proof_size_to_fee =
+        <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(
+            &frame_support::weights::Weight::from_parts(proof_size, 0),
+        );
 
     let total_fee = call_weight_to_fee + base_weight_to_fee + proof_size_to_fee;
 
@@ -823,17 +840,22 @@ fn should_weight_the_same() {
             let account = pair.public();
             let address = sp_runtime::MultiAddress::Id(account.into());
             let account_id: AccountId = account.into();
-            
+
             // Give the account some balance to pay for transaction fees
             let _ = Balances::deposit_creating(&account_id, INIT_BALANCE);
-            
+
             // Sign payload (directly sign call encoding, production environment may have additional signed extensions)
-            let extra = (frame_system::CheckWeight::new(), pallet_transaction_payment::ChargeTransactionPayment::from(0));
-            let payload = SignedPayload::new(call.clone(), extra.clone()).expect("payload should succeed");
+            let extra = (
+                frame_system::CheckWeight::new(),
+                pallet_transaction_payment::ChargeTransactionPayment::from(0),
+            );
+            let payload =
+                SignedPayload::new(call.clone(), extra.clone()).expect("payload should succeed");
             let signature = payload.using_encoded(|d| pair.sign(d));
             let multi_sig = MultiSignature::from(signature);
-            let remark_extrinsic = MockUncheckedExtrinsic::new_signed(call.clone(), address, multi_sig, extra);
-            
+            let remark_extrinsic =
+                MockUncheckedExtrinsic::new_signed(call.clone(), address, multi_sig, extra);
+
             // Record BlockWeight before execution
             let block_weight_before = frame_system::BlockWeight::<Test>::get();
 
@@ -861,7 +883,7 @@ fn should_weight_the_same() {
             weight
         })
     };
-    
+
     // 2. zklogin(frame_system::remark) - (wrapped by zklogin)
     let weight2 = {
         new_test_ext().execute_with(|| {
@@ -886,8 +908,9 @@ fn should_weight_the_same() {
             let signing_key: ed25519::Pair = get_test_eph_key();
             // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
             let inner_extra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-            let inner_payload = InnerSignedPayload::new(sys_remark_call.clone(), inner_extra.clone())
-                .expect("payload should succeed");
+            let inner_payload =
+                InnerSignedPayload::new(sys_remark_call.clone(), inner_extra.clone())
+                    .expect("payload should succeed");
             let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
             let uxt = InnerMockUncheckedExtrinsic::new_signed(
                 sys_remark_call.clone(),
@@ -942,7 +965,11 @@ fn should_weight_the_same() {
         })
     };
 
-    assert_eq!(weight1.ref_time(), weight2.ref_time(), "remark call and zklogin call should have the same weight");
+    assert_eq!(
+        weight1.ref_time(),
+        weight2.ref_time(),
+        "remark call and zklogin call should have the same weight"
+    );
 }
 
 // ================================ test proxy should work ================================
@@ -965,17 +992,19 @@ fn validate_add_proxy_should_work() {
     let delegator = address_seed.clone();
     let delegatee = AccountId::from([2u8; 32]);
     // construct Proxy Call(which set the `delegatee` as the proxy)
-    let proxy_call: RuntimeCall =
-        pallet_proxy::Call::add_proxy {
-            delegate: sp_runtime::MultiAddress::Id(delegatee.clone()),
-            proxy_type: (),
-            delay: 0u32,
-        }.into();
+    let proxy_call: RuntimeCall = pallet_proxy::Call::add_proxy {
+        delegate: sp_runtime::MultiAddress::Id(delegatee.clone()),
+        proxy_type: (),
+        delay: 0u32,
+    }
+    .into();
 
     // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-    let inner_extra: InnerSignedExtra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
+    let inner_extra: InnerSignedExtra =
+        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
 
-    let inner_payload = InnerSignedPayload::new(proxy_call.clone(), inner_extra.clone()).expect("payload should succeed");
+    let inner_payload = InnerSignedPayload::new(proxy_call.clone(), inner_extra.clone())
+        .expect("payload should succeed");
     let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
 
     let uxt = InnerMockUncheckedExtrinsic::new_signed(
@@ -1040,16 +1069,18 @@ fn validate_proxy_call_should_work() {
     let delegatee: AccountId = account.into();
 
     // construct Proxy Call(which set the `delegatee` as the proxy)
-    let proxy_call: RuntimeCall =
-        pallet_proxy::Call::add_proxy {
-            delegate: sp_runtime::MultiAddress::Id(delegatee.clone()),
-            proxy_type: (),
-            delay: 0u32,
-        }.into();
+    let proxy_call: RuntimeCall = pallet_proxy::Call::add_proxy {
+        delegate: sp_runtime::MultiAddress::Id(delegatee.clone()),
+        proxy_type: (),
+        delay: 0u32,
+    }
+    .into();
 
     // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-    let inner_extra: InnerSignedExtra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(proxy_call.clone(), inner_extra.clone()).expect("payload should succeed");
+    let inner_extra: InnerSignedExtra =
+        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
+    let inner_payload = InnerSignedPayload::new(proxy_call.clone(), inner_extra.clone())
+        .expect("payload should succeed");
     let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
 
     // construct inner unchecked_extrinsic
@@ -1078,7 +1109,6 @@ fn validate_proxy_call_should_work() {
         // Set jwk from root.
         assert_ok!(ZkLogin::set_jwk(RawOrigin::Root.into(), provider, jwks.as_bytes().to_vec()));
 
-
         System::set_block_number(10);
 
         // check the proxy is not set
@@ -1092,54 +1122,67 @@ fn validate_proxy_call_should_work() {
         let proxies = pallet_proxy::Proxies::<Test>::get(&delegator);
         assert!(proxies.0.iter().any(|def| def.delegate == delegatee));
 
-
         // Before the proxy execute call, we need to give the `delegatee` some balance to pay the fee
         let _ = Balances::deposit_creating(&delegatee, INIT_BALANCE);
 
         // transfer 100 from delegator to delegatee through proxy
         let before_delegatee = Balances::free_balance(&delegatee);
         let before_delegator = Balances::free_balance(&delegator);
-        
+
         // construct the transfer call(which transfer 100 from delegator to delegatee through proxy)
         let transfer_call: RuntimeCall = BalancesCall::transfer_keep_alive {
             dest: MultiAddress::Id(delegatee.clone()),
             value: 100,
-        }.into();
+        }
+        .into();
         let proxy_call = pallet_proxy::Call::<Test>::proxy {
             real: sp_runtime::MultiAddress::Id(delegator.clone()),
             force_proxy_type: None,
             call: Box::new(transfer_call),
         };
         // construct the outer UncheckedExtrinsic using `SignedExtra``
-        let extra = (frame_system::CheckWeight::new(), pallet_transaction_payment::ChargeTransactionPayment::from(0));
-        let payload = SignedPayload::new(proxy_call.clone().into(), extra.clone()).expect("payload should succeed");
+        let extra = (
+            frame_system::CheckWeight::new(),
+            pallet_transaction_payment::ChargeTransactionPayment::from(0),
+        );
+        let payload = SignedPayload::new(proxy_call.clone().into(), extra.clone())
+            .expect("payload should succeed");
         let sign = payload.using_encoded(|d| delegatee_pair.sign(d));
 
         let proxy_extrinsic = MockUncheckedExtrinsic::new_signed(
             proxy_call.clone().into(),
             delegatee.clone().into(),
             MultiSignature::from(sign),
-            extra.clone()
+            extra.clone(),
         );
 
         // calculate the `call_weight` & `call_weight_to_fee`
         let call_weight = proxy_call.clone().get_dispatch_info().weight;
-        let call_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
+        let call_weight_to_fee =
+            <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
 
         // calculate the `base weight` & `weight_to_fee`
-        let block_weights: frame_system::limits::BlockWeights = <Test as frame_system::Config>::BlockWeights::get();
-        let base_extrinsic = block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
-        let base_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
+        let block_weights: frame_system::limits::BlockWeights =
+            <Test as frame_system::Config>::BlockWeights::get();
+        let base_extrinsic =
+            block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
+        let base_weight_to_fee =
+            <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(
+                &base_extrinsic,
+            );
 
         // calculate the `proof_size` & `proof_size_to_fee`
         let proof_size = proxy_extrinsic.encode().len() as u64;
-        let proof_size_to_fee = <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(&frame_support::weights::Weight::from_parts(proof_size, 0));
+        let proof_size_to_fee =
+            <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(
+                &frame_support::weights::Weight::from_parts(proof_size, 0),
+            );
 
         let total_fee = call_weight_to_fee + base_weight_to_fee + proof_size_to_fee;
 
         // execute the proxy call
         assert_ok!(MockExecutive::apply_extrinsic(proxy_extrinsic));
-        
+
         // check the balance of the delegatee and delegator after the transfer
         let after_delegatee = Balances::free_balance(&delegatee);
         let after_delegator = Balances::free_balance(&delegator);
@@ -1150,7 +1193,6 @@ fn validate_proxy_call_should_work() {
         assert_eq!(after_delegator, before_delegator - 100);
     });
 }
-
 
 #[test]
 fn validate_remove_proxy_should_work() {
@@ -1165,22 +1207,25 @@ fn validate_remove_proxy_should_work() {
     let kids = google::kids(true);
     let kid = kids[0].clone();
 
-    let zk_material: primitive_zklogin::VersionedZkMaterial<u64> = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
+    let zk_material: primitive_zklogin::VersionedZkMaterial<u64> =
+        ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
 
     // construct Proxy Call(which set the `delegatee` as the proxy)
     let delegator = address_seed.clone();
     let delegatee = AccountId::from([2u8; 32]);
-    let proxy_call: RuntimeCall =
-        pallet_proxy::Call::add_proxy {
-            delegate: sp_runtime::MultiAddress::Id(delegatee.clone()),
-            proxy_type: (),
-            delay: 0u32,
-        }.into();
+    let proxy_call: RuntimeCall = pallet_proxy::Call::add_proxy {
+        delegate: sp_runtime::MultiAddress::Id(delegatee.clone()),
+        proxy_type: (),
+        delay: 0u32,
+    }
+    .into();
 
-    let inner_extra: InnerSignedExtra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(proxy_call.clone(), inner_extra.clone()).expect("payload should succeed");
+    let inner_extra: InnerSignedExtra =
+        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
+    let inner_payload = InnerSignedPayload::new(proxy_call.clone(), inner_extra.clone())
+        .expect("payload should succeed");
     let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
-    
+
     // construct inner unchecked_extrinsic
     let uxt = InnerMockUncheckedExtrinsic::new_signed(
         proxy_call,
@@ -1220,17 +1265,20 @@ fn validate_remove_proxy_should_work() {
         let proxies = pallet_proxy::Proxies::<Test>::get(&delegator);
         assert!(proxies.0.iter().any(|def| def.delegate == delegatee));
 
-
         // remove proxy call (which remove the `delegatee` as the proxy)
         let remove_proxy_call: RuntimeCall = pallet_proxy::Call::remove_proxy {
             delegate: sp_runtime::MultiAddress::Id(delegatee.clone()),
             proxy_type: (),
             delay: 0u32,
-        }.into();
-       
+        }
+        .into();
+
         // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-        let inner_remove_extra: InnerSignedExtra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-        let inner_remove_payload = InnerSignedPayload::new(remove_proxy_call.clone(), inner_remove_extra.clone()).expect("payload should succeed");
+        let inner_remove_extra: InnerSignedExtra =
+            (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
+        let inner_remove_payload =
+            InnerSignedPayload::new(remove_proxy_call.clone(), inner_remove_extra.clone())
+                .expect("payload should succeed");
         let inner_remove_sign = inner_remove_payload.using_encoded(|d| signing_key.sign(d));
 
         let uxt = InnerMockUncheckedExtrinsic::new_signed(
@@ -1259,8 +1307,6 @@ fn validate_remove_proxy_should_work() {
     });
 }
 
-
-
 // ================================ test recovery should work ================================
 #[test]
 fn validate_create_recovery_should_work() {
@@ -1279,19 +1325,23 @@ fn validate_create_recovery_should_work() {
 
     // construct Recovery Call(which create the recovery config) with 3 friends and threshold 1
     let recoverable_account = address_seed.clone();
-    let friends = vec![AccountId::from([1u8; 32]), AccountId::from([2u8; 32]), AccountId::from([3u8; 32])];
+    let friends =
+        vec![AccountId::from([1u8; 32]), AccountId::from([2u8; 32]), AccountId::from([3u8; 32])];
     let threshold = 1u16;
     let delay_period = 0u32;
-    
+
     let recovery_call: RuntimeCall = pallet_recovery::Call::create_recovery {
         friends: friends.clone(),
         threshold,
         delay_period,
-    }.into();
+    }
+    .into();
 
     // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-    let inner_extra: InnerSignedExtra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(recovery_call.clone(), inner_extra.clone()).expect("payload should succeed");
+    let inner_extra: InnerSignedExtra =
+        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
+    let inner_payload = InnerSignedPayload::new(recovery_call.clone(), inner_extra.clone())
+        .expect("payload should succeed");
     let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
 
     // construct inner unchecked_extrinsic
@@ -1346,26 +1396,30 @@ fn validate_complete_recovery_flow_should_work() {
     let kids = google::kids(true);
     let kid = kids[0].clone();
 
-    let zk_material: primitive_zklogin::VersionedZkMaterial<u64> = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
+    let zk_material: primitive_zklogin::VersionedZkMaterial<u64> =
+        ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
 
     // Setup accounts
     let lost_account = address_seed.clone(); // zk account
     let rescuer_account = AccountId::from([5u8; 32]); // rescuer account
     let friend1 = AccountId::from([1u8; 32]); // friend1 account
-    let friend2 = AccountId::from([2u8; 32]); // friend2 account 
+    let friend2 = AccountId::from([2u8; 32]); // friend2 account
     let friend3 = AccountId::from([3u8; 32]); // friend3 account
     let friends = vec![friend1.clone(), friend2.clone(), friend3.clone()];
     let threshold = 1u16;
     let delay_period = 0u32;
-    
+
     // Step 1: Lost account creates recovery config using zk account
     let create_recovery_call: RuntimeCall = pallet_recovery::Call::create_recovery {
         friends: friends.clone(),
         threshold,
         delay_period,
-    }.into();
-    let inner_extra: InnerSignedExtra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(create_recovery_call.clone(), inner_extra.clone()).expect("payload should succeed");
+    }
+    .into();
+    let inner_extra: InnerSignedExtra =
+        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
+    let inner_payload = InnerSignedPayload::new(create_recovery_call.clone(), inner_extra.clone())
+        .expect("payload should succeed");
     let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
 
     let uxt = InnerMockUncheckedExtrinsic::new_signed(
@@ -1383,16 +1437,23 @@ fn validate_complete_recovery_flow_should_work() {
 
     // calculate the `call_weight` & `call_weight_to_fee`
     let call_weight = create_final_call.clone().get_dispatch_info().weight;
-    let call_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
+    let call_weight_to_fee =
+        <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
 
     // calculate the `base weight` & `weight_to_fee`
-    let block_weights: frame_system::limits::BlockWeights = <Test as frame_system::Config>::BlockWeights::get();
-    let base_extrinsic = block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
-    let base_weight_to_fee = <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
+    let block_weights: frame_system::limits::BlockWeights =
+        <Test as frame_system::Config>::BlockWeights::get();
+    let base_extrinsic =
+        block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
+    let base_weight_to_fee =
+        <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
 
     // calculate the `proof_size` & `proof_size_to_fee`
     let proof_size = uxt.clone().encode().len() as u64;
-    let proof_size_to_fee = <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(&frame_support::weights::Weight::from_parts(proof_size, 0));
+    let proof_size_to_fee =
+        <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(
+            &frame_support::weights::Weight::from_parts(proof_size, 0),
+        );
 
     let total_fee = call_weight_to_fee + base_weight_to_fee + proof_size_to_fee;
 
@@ -1401,7 +1462,7 @@ fn validate_complete_recovery_flow_should_work() {
         assert_ok!(ZkLogin::set_jwk(RawOrigin::Root.into(), provider, jwks.as_bytes().to_vec()));
 
         System::set_block_number(10);
-          
+
         // Step 1: Create recovery config using zk account
         assert_ok!(create_final_call.dispatch_bypass_filter(RawOrigin::<AccountId>::None.into()));
         let recoverable = pallet_recovery::Recoverable::<Test>::get(&lost_account);
@@ -1410,23 +1471,29 @@ fn validate_complete_recovery_flow_should_work() {
         // Step 2: Rescuer initiates recovery using regular account
         let initiate_recovery_call: RuntimeCall = pallet_recovery::Call::initiate_recovery {
             account: sp_runtime::MultiAddress::Id(lost_account.clone()),
-        }.into();
-        
-        assert_ok!(initiate_recovery_call.dispatch_bypass_filter(RawOrigin::Signed(rescuer_account.clone()).into()));
-        let active = pallet_recovery::ActiveRecoveries::<Test>::get(&lost_account, &rescuer_account);
+        }
+        .into();
+
+        assert_ok!(initiate_recovery_call
+            .dispatch_bypass_filter(RawOrigin::Signed(rescuer_account.clone()).into()));
+        let active =
+            pallet_recovery::ActiveRecoveries::<Test>::get(&lost_account, &rescuer_account);
         assert!(active.is_some());
 
         // Step 3: Friend vouches for recovery
         let vouch_recovery_call: RuntimeCall = pallet_recovery::Call::vouch_recovery {
             lost: sp_runtime::MultiAddress::Id(lost_account.clone()),
             rescuer: sp_runtime::MultiAddress::Id(rescuer_account.clone()),
-        }.into();
+        }
+        .into();
 
         // Before the rescuer initiate recovery, we need to give the `rescuer` and `friend1` some balance to pay the fee
         let _ = Balances::deposit_creating(&rescuer_account, INIT_BALANCE);
         let _ = Balances::deposit_creating(&friend1, INIT_BALANCE);
-        
-        assert_ok!(vouch_recovery_call.dispatch_bypass_filter(RawOrigin::Signed(friend1.clone()).into()));
+
+        assert_ok!(
+            vouch_recovery_call.dispatch_bypass_filter(RawOrigin::Signed(friend1.clone()).into())
+        );
 
         // Step 4: Wait for delay period before claiming recovery
         System::set_block_number(10 + delay_period);
@@ -1434,8 +1501,10 @@ fn validate_complete_recovery_flow_should_work() {
         // Step 5: Rescuer claims recovery
         let claim_recovery_call: RuntimeCall = pallet_recovery::Call::claim_recovery {
             account: sp_runtime::MultiAddress::Id(lost_account.clone()),
-        }.into();
-        assert_ok!(claim_recovery_call.dispatch_bypass_filter(RawOrigin::Signed(rescuer_account.clone()).into()));
+        }
+        .into();
+        assert_ok!(claim_recovery_call
+            .dispatch_bypass_filter(RawOrigin::Signed(rescuer_account.clone()).into()));
         let proxy = pallet_recovery::Proxy::<Test>::get(&rescuer_account);
         assert!(proxy.is_some());
 
@@ -1444,27 +1513,29 @@ fn validate_complete_recovery_flow_should_work() {
         let transfer_call: RuntimeCall = BalancesCall::transfer_keep_alive {
             dest: MultiAddress::Id(dest_account.clone()),
             value: 100,
-        }.into();
+        }
+        .into();
 
         let as_recovered_call: RuntimeCall = pallet_recovery::Call::as_recovered {
             account: sp_runtime::MultiAddress::Id(lost_account.clone()),
             call: Box::new(transfer_call),
-        }.into();
-        
+        }
+        .into();
+
         // check the balance of the destination account before the transfer
         assert_eq!(Balances::free_balance(&dest_account), 0);
 
-        assert_ok!(as_recovered_call.dispatch_bypass_filter(RawOrigin::Signed(rescuer_account.clone()).into()));
-        
+        assert_ok!(as_recovered_call
+            .dispatch_bypass_filter(RawOrigin::Signed(rescuer_account.clone()).into()));
+
         // Verify transfer was successful
         assert_eq!(Balances::free_balance(&dest_account), 100);
 
-        // check the balance of the zk_address after the transfer 
+        // check the balance of the zk_address after the transfer
         // balance should init_balance deducting the `fee` and `the transfer amount` when doing the `create_recovery` call)
         assert_eq!(Balances::free_balance(&zk_address()), INIT_BALANCE - total_fee - 100);
     });
 }
-
 
 fn header_from_number(n: u32) -> sp_runtime::generic::Header<u32, BlakeTwo256> {
     sp_runtime::generic::Header {
@@ -1475,4 +1546,3 @@ fn header_from_number(n: u32) -> sp_runtime::generic::Header<u32, BlakeTwo256> {
         digest: Default::default(),
     }
 }
-

@@ -13,27 +13,30 @@ mod benchmark_data;
 
 pub mod weights;
 
-use scale_codec::{Codec, Encode};
-use sp_runtime::TransactionOutcome;
-use frame_support::storage::with_transaction;
+use frame_system::RawOrigin;
+use scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use scale_info::TypeInfo;
+
 use frame_support::{
     dispatch::{
-        DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo, PostDispatchInfo,
+        DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo,
     },
-    traits::Time,
+    traits::{Time, IsSubType},
+    RuntimeDebugNoBound,
 };
 use sp_runtime::{
-    traits::{Applyable, Checkable, Dispatchable, Extrinsic, SignaturePayload, StaticLookup},
-    transaction_validity::{
-        InvalidTransaction, TransactionValidityError, UnknownTransaction, ValidTransaction,
+    traits::{
+        AsSystemOriginSigner, DispatchInfoOf, Dispatchable, PostDispatchInfoOf, StaticLookup, TransactionExtension,
     },
+    transaction_validity::{
+        InvalidTransaction, TransactionSource, TransactionValidity, TransactionValidityError,
+        ValidTransaction,
+    },
+    DispatchResult, Weight,
 };
 use sp_std::prelude::*;
 
-use primitive_zklogin::{
-    traits::{ExtrinsicExt, ReplaceSender, SignaturePayloadExt, TryIntoEphPubKey},
-    Jwk, JwkProvider, Kid, ZkMaterial,
-};
+use primitive_zklogin::{Jwk, JwkProvider, Kid, ZkMaterial};
 
 use crate::offchain_worker::JwksPayload;
 // re-export
@@ -51,48 +54,34 @@ pub type MomentOf<T> = <<T as Config>::Time as Time>::Moment;
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
-    use frame_support::{dispatch::PostDispatchInfo, pallet_prelude::*};
+    use frame_support::pallet_prelude::*;
     use frame_system::{
-        offchain::{AppCrypto, SignedPayload},
+        offchain::{AppCrypto, CreateInherent, CreateSignedTransaction, SignedPayload},
         pallet_prelude::*,
-        RawOrigin,
     };
-    use sp_core::crypto::AccountId32;
+    use sp_core::H256;
 
     #[pallet::config]
     pub trait Config:
-        frame_system::offchain::SendTransactionTypes<Call<Self>>
-        + frame_system::offchain::SigningTypes
-        + frame_system::Config
-    where
-        Self::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-        <<Self as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<Self as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
+        CreateSignedTransaction<Call<Self>> + CreateInherent<Call<Self>> + frame_system::Config
     {
+        type RuntimeEvent: From<Event<Self>>
+            + IsType<<Self as frame_system::Config>::RuntimeEvent>
+            + TryInto<Event<Self>>;
+
+        /// The overarching call type.
+        type RuntimeCall: Parameter
+            + Dispatchable<RuntimeOrigin = Self::RuntimeOrigin, PostInfo = PostDispatchInfo>
+            + GetDispatchInfo
+            + From<frame_system::Call<Self>>
+            + IsSubType<Call<Self>>
+            + IsType<<Self as frame_system::Config>::RuntimeCall>;
+
         /// The identifier type for an offchain worker.
         type AuthorityId: AppCrypto<Self::Public, Self::Signature>; // + Parameter + MaxEncodedLen;
 
         /// The maximum number of keys that can be added.
         type MaxKeys: Get<u32>;
-
-        type RuntimeEvent: From<Event<Self>>
-            + IsType<<Self as frame_system::Config>::RuntimeEvent>
-            + TryInto<Event<Self>>;
-
-        /// Same as `Executive`, required by `Checkable` for `Self::Extrinsic`
-        type Context: Default;
-
-        type Extrinsic: ExtrinsicExt<Call = Self::RuntimeCall>
-            + Checkable<Self::Context, Checked = Self::CheckedExtrinsic>
-            + Codec
-            + TypeInfo
-            + Member
-            + GetDispatchInfo;
-
-        type CheckedExtrinsic: Applyable<Call = Self::RuntimeCall>
-            + GetDispatchInfo
-            + ReplaceSender<AccountId = Self::AccountId>;
-
         /// Same as `Executive`
         type UnsignedValidator: ValidateUnsigned<Call = Self::RuntimeCall>;
 
@@ -104,14 +93,9 @@ pub mod pallet {
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
-    pub enum Event<T: Config>
-    where
-        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-        <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
-    {
+    pub enum Event<T: Config> {
         ZkLoginExecuted {
-            result: DispatchResult,
+            account: T::AccountId,
         },
 
         /// Update Jwks for the provider.
@@ -158,49 +142,45 @@ pub mod pallet {
         StorageDoubleMap<_, Twox64Concat, JwkProvider, Twox64Concat, Kid, Jwk>;
 
     #[pallet::hooks]
-    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
-    where
-        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-        <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
-    {
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         fn offchain_worker(block_number: BlockNumberFor<T>) {
             offchain_worker::offchain_worker_entrypoint::<T>(block_number);
         }
     }
 
     #[pallet::call]
-    impl<T: Config> Pallet<T>
-    where
-        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-        <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
-    {
+    impl<T: Config> Pallet<T> {
         // TODO: provide a valid weight
         #[pallet::call_index(0)]
         #[pallet::weight({
-            uxt.get_dispatch_info().weight
-            // 0
+            // uxt.get_dispatch_info().weight
+            0
         })]
-        pub fn submit_zklogin_unsigned(
+        pub fn submit_zklogin(
             origin: OriginFor<T>,
-            uxt: Box<<T as Config>::Extrinsic>,
-            address_seed: AccountIdLookupOf<T>,
+            call: Box<<T as Config>::RuntimeCall>,
+            address_seed: H256,
             zk_material: ZkMaterial<MomentOf<T>>,
         ) -> DispatchResultWithPostInfo {
             // make sure this call is unsigned signed
-            ensure_none(origin)?;
+            let zk_account = ensure_signed(origin.clone())?;
 
-            // check ephemeral key's expiration time
+            // check ephemeral key's expiration time, TODO move to `validate`?
             let now = T::Time::now();
             let expire_at: MomentOf<T> = zk_material.get_ephkey_expire_at();
             ensure!(expire_at >= now, Error::<T>::EphKeyExpired);
 
             // execute real call
-            let r = Executive::<T>::apply_extrinsic(uxt, address_seed);
-            let exec_res: DispatchResult = r.map(|_| ()).map_err(|e| e.error);
-            Self::deposit_event(Event::ZkLoginExecuted { result: exec_res });
-            r
+            let mut filtered_origin = origin.clone();
+            // Don't allow users to nest `submit_zklogin` calls.
+            filtered_origin.add_filter(move |c: &<T as frame_system::Config>::RuntimeCall| {
+                let c = <T as Config>::RuntimeCall::from_ref(c);
+                !matches!(c.is_sub_type(), Some(Call::submit_zklogin { .. }))
+            });
+            // TODO when err return at here? or at final
+            let r = call.dispatch(filtered_origin)?;
+            Self::deposit_event(Event::ZkLoginExecuted { account: zk_account });
+            Ok(r.into())
         }
 
         /// TODO doc
@@ -268,12 +248,7 @@ pub mod pallet {
     }
 
     // Helper functions
-    impl<T: Config> Pallet<T>
-    where
-        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-        <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
-    {
+    impl<T: Config> Pallet<T> {
         fn insert_jwks(
             provider: JwkProvider,
             jwks: Vec<Jwk>,
@@ -296,13 +271,7 @@ pub mod pallet {
     }
 
     #[pallet::validate_unsigned]
-    impl<T: Config> ValidateUnsigned for Pallet<T>
-    where
-        T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-        <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-        <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
-        T: frame_system::Config<AccountId = AccountId32>,
-    {
+    impl<T: Config> ValidateUnsigned for Pallet<T> {
         type Call = Call<T>;
 
         fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
@@ -316,59 +285,58 @@ pub mod pallet {
 
             // verify signature
             match call {
-                Call::submit_zklogin_unsigned { uxt, address_seed, zk_material } => {
-                    let (provider, kid) = zk_material.source();
-                    // We require the provider and kid must exist on chain before submit extrinsic.
-                    let jwk = Jwks::<T>::get(provider, kid)
-                        .ok_or::<TransactionValidityError>(InvalidTransaction::Call.into())?;
+                // Call::submit_zklogin_unsigned { uxt, address_seed, zk_material } => {
+                //     let (provider, kid) = zk_material.source();
+                //     // We require the provider and kid must exist on chain before submit extrinsic.
+                //     let jwk = Jwks::<T>::get(provider, kid)
+                //         .ok_or::<TransactionValidityError>(InvalidTransaction::Call.into())?;
 
-                    // Only signed extrinsic is allowed
-                    let eph_pubkey = match uxt.signature_payload() {
-                        // This extrinsic is not a signed one.
-                        None => return InvalidTransaction::Call.into(),
-                        Some(payload) => {
-                            payload.signature_address().try_into_eph_key().map_err::<TransactionValidityError, _>(|e| {
-                                log::warn!(target: TARGET, "The signer can not convert to a valid eph pubkey. err: {:?}", e);
-                                InvalidTransaction::BadSigner.into()
-                            })?
-                        }
-                    };
+                //     // Only signed extrinsic is allowed
+                //     let eph_pubkey = match uxt.signature_payload() {
+                //         // This extrinsic is not a signed one.
+                //         None => return InvalidTransaction::Call.into(),
+                //         Some(payload) => {
+                //             payload.signature_address().try_into_eph_key().map_err::<TransactionValidityError, _>(|e| {
+                //                 log::warn!(target: TARGET, "The signer can not convert to a valid eph pubkey. err: {:?}", e);
+                //                 InvalidTransaction::BadSigner.into()
+                //             })?
+                //         }
+                //     };
 
-                    // the zkLogin address that will pay for the tx fee and execute the real call
-                    let address_seed = T::Lookup::lookup(address_seed.clone())?;
+                //     // the zkLogin address that will pay for the tx fee and execute the real call
+                //     let address_seed = T::Lookup::lookup(address_seed.clone())?;
 
-                    let encoded = uxt.encode();
-                    let encoded_len = encoded.len();
-                    // Check Signature
-                    let mut xt = uxt.clone().check(&T::Context::default())?;
+                //     let encoded = uxt.encode();
+                //     let encoded_len = encoded.len();
+                //     // Check Signature
+                //     let mut xt = uxt.clone().check(&T::Context::default())?;
 
-                    // IMPORTANT
-                    // replace sender in CheckedExtrinsic
-                    // This is due to zkLogin's mechanism, it uses `ephemeral key` to sign and submit tx
-                    // while the real transaction is executed and transaction fee paid
-                    // through the `zklogin_address` that is derived from JWT
-                    xt.replace_sender(address_seed.clone());
-                    // Decode parameters and dispatch
-                    let dispatch_info = xt.get_dispatch_info();
-                    // Check dispatch_class: mandatory extrinsic is not allowed to use zklogin
-                    if dispatch_info.class == DispatchClass::Mandatory {
-                        return InvalidTransaction::BadMandatory.into();
-                    }
+                //     // IMPORTANT
+                //     // replace sender in CheckedExtrinsic
+                //     // This is due to zkLogin's mechanism, it uses `ephemeral key` to sign and submit tx
+                //     // while the real transaction is executed and transaction fee paid
+                //     // through the `zklogin_address` that is derived from JWT
+                //     xt.replace_sender(address_seed.clone());
+                //     // Decode parameters and dispatch
+                //     let dispatch_info = xt.get_dispatch_info();
+                //     // Check dispatch_class: mandatory extrinsic is not allowed to use zklogin
+                //     if dispatch_info.class == DispatchClass::Mandatory {
+                //         return InvalidTransaction::BadMandatory.into();
+                //     }
 
-                    // validate zk proof
-                    zk_material
-                        .verify_zk_login(eph_pubkey, &address_seed, &jwk)
-                        .map_err(|_| InvalidTransaction::BadProof)?;
+                //     // validate zk proof
+                //     zk_material
+                //         .verify_zk_login(eph_pubkey, &address_seed, &jwk)
+                //         .map_err(|_| InvalidTransaction::BadProof)?;
 
-
-                    let r = with_transaction::<TransactionValidity, DispatchError, _>(|| {
-                        let result = xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len);
-                        // must rollback for any case
-                        TransactionOutcome::Rollback(Ok(result))
-                    });
-                    // discard this part
-                    r.unwrap()
-                }
+                //     let r = with_transaction::<TransactionValidity, DispatchError, _>(|| {
+                //         let result = xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len);
+                //         // must rollback for any case
+                //         TransactionOutcome::Rollback(Ok(result))
+                //     });
+                //     // discard this part
+                //     r.unwrap()
+                // }
                 Call::submit_jwks_unsigned { payload, signature } => {
                     let signature_valid =
                         SignedPayload::<T>::verify::<T::AuthorityId>(payload, signature.clone());
@@ -396,12 +364,12 @@ pub mod pallet {
                             // If check return `None`, means this unsigend extrinsic contains
                             // invalid jwk. return error for this check.
                             log::error!(target: TARGET, "The unsigned contains invalid Jwk for provider: {:?}", provider);
-                            return Err(InvalidTransaction::Call.into())
+                            return Err(InvalidTransaction::Call.into());
                         }
 
                         if result.iter().map(|x| x.unwrap_or(false)).all(|x| !x) {
                             log::error!(target: TARGET, "All Jwks for provider: {:?} in this unsigned are existed onchain", provider);
-                            return Err(InvalidTransaction::Call.into())
+                            return Err(InvalidTransaction::Call.into());
                         }
                     }
 
@@ -420,57 +388,162 @@ pub mod pallet {
     }
 }
 
-pub type CheckedOf<E, C> = <E as Checkable<C>>::Checked;
+// pub type CheckedOf<E, C> = <E as Checkable<C>>::Checked;
 
-struct Executive<T>(sp_std::marker::PhantomData<T>);
+// struct Executive<T>(sp_std::marker::PhantomData<T>);
 
-impl<T: Config> Executive<T>
-where
-    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-    <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
-{
-    fn apply_extrinsic(
-        uxt: Box<<T as Config>::Extrinsic>,
-        address_seed: AccountIdLookupOf<T>,
-    ) -> DispatchResultWithPostInfo {
-        let encoded = uxt.encode();
-        let encoded_len = encoded.len();
+// impl<T: Config> Executive<T>
+// where
+//     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+//     <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
+//     <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
+// {
+//     fn apply_extrinsic(
+//         uxt: Box<<T as Config>::Extrinsic>,
+//         address_seed: AccountIdLookupOf<T>,
+//     ) -> DispatchResultWithPostInfo {
+//         let encoded = uxt.encode();
+//         let encoded_len = encoded.len();
 
-        // Verify that the signature is good.
-        let mut xt = uxt.check(&T::Context::default()).expect("process ?");
-        xt.replace_sender(T::Lookup::lookup(address_seed).expect("lookup should succeed"));
+//         // Verify that the signature is good.
+//         let mut xt = uxt.check(&T::Context::default()).expect("process ?");
+//         xt.replace_sender(T::Lookup::lookup(address_seed).expect("lookup should succeed"));
 
-        let dispatch_info = xt.get_dispatch_info();
-        let r = Applyable::apply::<T::UnsignedValidator>(xt, &dispatch_info, encoded_len)
-            .map_err(Error::<T>::from)?;
+//         let dispatch_info = xt.get_dispatch_info();
+//         let r = Applyable::apply::<T::UnsignedValidator>(xt, &dispatch_info, encoded_len)
+//             .map_err(Error::<T>::from)?;
 
-        // For we has checked the `dispatch_info.class` in `validate_unsigned`, so the check at here is not
-        // necessary. We keep this to be same implementation in `Executive`.
-        if r.is_err() && dispatch_info.class == DispatchClass::Mandatory {
-            return Err(Error::<T>::InvalidTransaction.into());
-        }
+//         // For we has checked the `dispatch_info.class` in `validate_unsigned`, so the check at here is not
+//         // necessary. We keep this to be same implementation in `Executive`.
+//         if r.is_err() && dispatch_info.class == DispatchClass::Mandatory {
+//             return Err(Error::<T>::InvalidTransaction.into());
+//         }
 
-        r
-    }
+//         r
+//     }
+// }
+
+/// Operation to perform from `prepare` to `post_dispatch_details` in [`ZkLoginExtension`] transaction
+/// extension.
+#[derive(RuntimeDebugNoBound)]
+pub enum Val {
+    /// The transaction extension weight should not be refunded.
+    Checked,
+    /// The transaction extension weight should be refunded.
+    Refund(Weight),
 }
 
-impl<T: Config> From<TransactionValidityError> for Error<T>
+#[derive(Encode, Decode, Clone, Eq, PartialEq, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct ZkLoginExtension<T: Config + Send + Sync> {
+    _phantom: core::marker::PhantomData<T>,
+}
+
+impl<T: Config + Send + Sync> TransactionExtension<T::RuntimeCall> for ZkLoginExtension<T>
 where
-    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-    <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-    <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
+    T::RuntimeCall: Dispatchable<Info = DispatchInfo>,
+    <T::RuntimeCall as Dispatchable>::RuntimeOrigin: AsSystemOriginSigner<T::AccountId> + Clone,
+    // TODO assume AccountId32 limit can be removed after checking zk logic
+    T: frame_system::Config<AccountId = sp_core::crypto::AccountId32>,
 {
-    fn from(value: TransactionValidityError) -> Self {
-        match value {
-            TransactionValidityError::Invalid(_) => Error::InvalidTransaction,
-            TransactionValidityError::Unknown(u) => match u {
-                UnknownTransaction::CannotLookup => Error::UnknownTransactionCannotLookup,
-                UnknownTransaction::NoUnsignedValidator => {
-                    Error::UnknownTransactionNoUnsignedValidator
+    const IDENTIFIER: &'static str = "ZkLoginExtension";
+
+    type Implicit = ();
+
+    type Val = Val;
+
+    type Pre = Val;
+
+    fn weight(&self, call: &T::RuntimeCall) -> Weight {
+        // TODO change weight value to a proper one, banchmarks for calculate the validation of zk proof
+        Weight::from_parts(1_000, 0)
+    }
+
+    fn validate(
+        &self,
+        origin: <T::RuntimeCall as Dispatchable>::RuntimeOrigin,
+        call: &T::RuntimeCall,
+        info: &DispatchInfoOf<T::RuntimeCall>,
+        len: usize,
+        self_implicit: Self::Implicit,
+        inherited_implication: &impl sp_runtime::traits::Implication,
+        source: frame_support::pallet_prelude::TransactionSource,
+    ) -> sp_runtime::traits::ValidateResult<Self::Val, T::RuntimeCall> {
+        match call.is_sub_type().as_ref() {
+            Some(Call::submit_zklogin { address_seed, zk_material, .. }) => {
+                // TODO not decide whether we need to limit call type.
+                //     // Check dispatch_class: mandatory extrinsic is not allowed to use zklogin
+                //     if dispatch_info.class == DispatchClass::Mandatory {
+                //         return InvalidTransaction::BadMandatory.into();
+                //     }
+
+                let who: &T::AccountId =
+                    origin.as_system_origin_signer().ok_or(InvalidTransaction::BadSigner)?;
+                // TODO maybe need a better method to convert to eph_pubkey
+                let eph_pubkey = *(who.as_ref());
+
+                // check ephemeral key's expiration time
+                let now = T::Time::now();
+                let expire_at: MomentOf<T> = zk_material.get_ephkey_expire_at();
+                if expire_at < now {
+                    return Err(InvalidTransaction::BadProof.into());
                 }
-                UnknownTransaction::Custom(_) => Error::UnknownTransactionCustom,
-            },
+
+                let (provider, kid) = zk_material.source();
+                // We require the provider and kid must exist on chain before submit extrinsic.
+                let jwk = Jwks::<T>::get(provider, kid)
+                    .ok_or::<TransactionValidityError>(InvalidTransaction::Call.into())?;
+
+                // validate zk proof
+                zk_material
+                    .verify_zk_login(eph_pubkey, address_seed, &jwk)
+                    .map_err(|_| InvalidTransaction::BadProof)?;
+
+
+                // TODO only support accountid: accountid32 now.
+                let zk_account: T::AccountId = address_seed.clone().into_account();
+                Ok((ValidTransaction::default(), Val::Checked, RawOrigin::Signed(zk_account).into()))
+            }
+            _ => Ok((ValidTransaction::default(),Val::Refund(self.weight(call)), origin)),
+        }
+    }
+
+    fn prepare(
+        self,
+        val: Self::Val,
+        _origin: &<T::RuntimeCall as Dispatchable>::RuntimeOrigin,
+        _call: &T::RuntimeCall,
+        _info: &DispatchInfoOf<T::RuntimeCall>,
+        _len: usize,
+    ) -> Result<Self::Pre, TransactionValidityError> {
+        Ok(val)
+    }
+
+    fn post_dispatch_details(
+        pre: Self::Pre,
+        _info: &DispatchInfo,
+        _post_info: &PostDispatchInfoOf<T::RuntimeCall>,
+        _len: usize,
+        _result: &DispatchResult,
+    ) -> Result<Weight, TransactionValidityError> {
+        match pre {
+            Val::Checked => Ok(Weight::zero()),
+            Val::Refund(weight) => Ok(weight),
         }
     }
 }
+
+// impl<T: Config> From<TransactionValidityError> for Error<T> {
+//     fn from(value: TransactionValidityError) -> Self {
+//         match value {
+//             TransactionValidityError::Invalid(_) => Error::InvalidTransaction,
+//             TransactionValidityError::Unknown(u) => match u {
+//                 UnknownTransaction::CannotLookup => Error::UnknownTransactionCannotLookup,
+//                 UnknownTransaction::NoUnsignedValidator => {
+//                     Error::UnknownTransactionNoUnsignedValidator
+//                 }
+//                 UnknownTransaction::Custom(_) => Error::UnknownTransactionCustom,
+//             },
+//         }
+//     }
+// }
