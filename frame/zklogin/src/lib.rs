@@ -82,8 +82,8 @@ pub mod pallet {
 
         /// The maximum number of keys that can be added.
         type MaxKeys: Get<u32>;
-        /// Same as `Executive`
-        type UnsignedValidator: ValidateUnsigned<Call = <Self as Config>::RuntimeCall>;
+
+        // type UnsignedValidator: ValidateUnsigned;
 
         type Time: Time;
 
@@ -159,7 +159,7 @@ pub mod pallet {
         pub fn submit_zklogin(
             origin: OriginFor<T>,
             call: Box<<T as Config>::RuntimeCall>,
-            address_seed: H256,
+            _address_seed: H256,
             zk_material: ZkMaterial<MomentOf<T>>,
         ) -> DispatchResultWithPostInfo {
             // make sure this call is unsigned signed
@@ -274,7 +274,7 @@ pub mod pallet {
     impl<T: Config> ValidateUnsigned for Pallet<T> {
         type Call = Call<T>;
 
-        fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+        fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
             // TODO no need? `submit_jwks_unsigned` needs `Local` while `submit_zklogin_unsigned` needs `InBlock` & `External`, while in future `submit_jwks_unsigned` may also need `Local`.
             // validate the transaction that is submitted from external (not local)
             // or included in transaction pool
@@ -454,7 +454,7 @@ where
 
     type Pre = Val;
 
-    fn weight(&self, call: &<T as Config>::RuntimeCall) -> Weight {
+    fn weight(&self, _call: &<T as Config>::RuntimeCall) -> Weight {
         // TODO change weight value to a proper one, banchmarks for calculate the validation of zk proof
         Weight::from_parts(1_000, 0)
     }
@@ -463,10 +463,10 @@ where
         &self,
         origin: <<T as Config>::RuntimeCall as Dispatchable>::RuntimeOrigin,
         call: &<T as Config>::RuntimeCall,
-        info: &DispatchInfoOf<<T as Config>::RuntimeCall>,
-        len: usize,
-        self_implicit: Self::Implicit,
-        inherited_implication: &impl sp_runtime::traits::Implication,
+        _info: &DispatchInfoOf<<T as Config>::RuntimeCall>,
+        _len: usize,
+        _self_implicit: Self::Implicit,
+        _inherited_implication: &impl sp_runtime::traits::Implication,
         _source: frame_support::pallet_prelude::TransactionSource,
     ) -> sp_runtime::traits::ValidateResult<Self::Val, <T as Config>::RuntimeCall> {
         match <<T as Config>::RuntimeCall as IsSubType<Call<T>>>::is_sub_type(call) {
