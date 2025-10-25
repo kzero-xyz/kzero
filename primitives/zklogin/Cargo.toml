@@ -14,7 +14,8 @@ serde_json = { workspace = true }
 scale-codec = { workspace = true, features = ["derive"] }
 scale-info = { workspace = true, features = ["derive"] }
 # others
-base64ct = { version = "1.5.3", features = ["alloc"] }
+# base64ct = { version = "1.5.3", features = ["alloc"] }
+base64 = "0.22.1"
 
 # zk primitives
 ark-bn254 = { version = "0.4.0", default-features = false, features = ["curve"] }
@@ -34,7 +35,8 @@ sp-runtime = { workspace = true }
 sp-std = { workspace = true }
 
 # jwk
-jsonwebtoken = { workspace = true }
+# jsonwebtoken = { workspace = true }
+jose-jwk = { workspace = true, default-features = false }
 
 [dev-dependencies]
 serde = { workspace = true, features = ["std", "derive"] }
@@ -55,7 +57,7 @@ std = [
     "scale-codec/std",
     "scale-info/std",
     # others
-    "base64ct/std",
+    # "base64ct/std",
     # zk primitives
     "ark-crypto-primitives/std",
     "ark-groth16/std",
@@ -71,7 +73,7 @@ std = [
     "sp-io/std",
     "sp-std/std",
     # jwk
-    "jsonwebtoken/std",
+    # "jsonwebtoken/std",
 ]
 testing = [
     "serde/std",

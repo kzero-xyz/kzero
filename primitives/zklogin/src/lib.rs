@@ -11,7 +11,8 @@ use crate::{
 use ark_bn254::Bn254;
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::{Groth16, Proof};
-use base64ct::{Base64UrlUnpadded, Encoding};
+// use base64ct::{Base64UrlUnpadded, Encoding};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
@@ -21,10 +22,12 @@ use sp_std::vec::Vec;
 pub use error::{ZkAuthError, ZkAuthResult};
 pub use zk_input::{ZkLoginInputs, ZkLoginProof, Claim};
 
-pub use jsonwebtoken::{
-    errors::ErrorKind,
-    jwk::{AlgorithmParameters, Jwk},
-};
+// pub use jsonwebtoken::{
+//     errors::ErrorKind,
+//     jwk::{AlgorithmParameters, Jwk},
+// };
+
+pub use jose_jwk::{Jwk, Key};
 
 mod circom;
 mod error;
@@ -277,9 +280,16 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterialV1<Moment> {
         address_seed: &H256,
         jwk: &Jwk,
     ) -> ZkAuthResult<()> {
-        let modulus = if let AlgorithmParameters::RSA(ref key_params) = jwk.algorithm {
-            // Decode modulus to bytes.
-            Base64UrlUnpadded::decode_vec(&key_params.n)
+
+        // let modulus = if let AlgorithmParameters::RSA(ref key_params) = jwk.algorithm {
+        //     // Decode modulus to bytes.
+        //     // Base64UrlUnpadded::decode_vec(&key_params.n)
+        //     //     .map_err(|_| ZkAuthError::ModulusDecodeError)?
+        // } else {
+        //     return Err(ZkAuthError::UnsupportedAlgorithm);
+        // };
+        let modulus = if let Key::Rsa(ref rsa) = jwk.key {
+            URL_SAFE_NO_PAD.decode(&rsa.n)
                 .map_err(|_| ZkAuthError::ModulusDecodeError)?
         } else {
             return Err(ZkAuthError::UnsupportedAlgorithm);
