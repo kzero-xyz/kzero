@@ -4337,6 +4337,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "jose-b64"
+version = "0.1.2"
+dependencies = [
+ "base64ct",
+ "serde",
+ "subtle 2.5.0",
+ "zeroize",
+]
+
+[[package]]
+name = "jose-jwa"
+version = "0.1.2"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "jose-jwk"
+version = "0.1.2"
+dependencies = [
+ "jose-b64",
+ "jose-jwa",
+ "serde",
+ "zeroize",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4474,19 +4501,6 @@ dependencies = [
  "jsonrpsee-core",
  "jsonrpsee-types",
  "url",
-]
-
-[[package]]
-name = "jsonwebtoken"
-version = "9.3.0"
-source = "git+https://github.com/mimir-labs/jsonwebtoken?branch=no_std_v9.3.0#0f29e31f50d6fad9f8360db24f60b8217df6f10d"
-dependencies = [
- "base64 0.21.6",
- "parity-scale-codec",
- "ring 0.17.14",
- "scale-info",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -6336,7 +6350,6 @@ dependencies = [
  "frame-executive",
  "frame-support",
  "frame-system",
- "jsonwebtoken",
  "log",
  "pallet-balances",
  "pallet-proxy",
@@ -7086,9 +7099,9 @@ dependencies = [
  "ark-ff 0.4.2",
  "ark-groth16",
  "ark-relations",
- "base64ct",
+ "base64 0.22.1",
  "ff",
- "jsonwebtoken",
+ "jose-jwk",
  "num-bigint 0.4.4",
  "parity-scale-codec",
  "poseidon-ark",
@@ -12949,6 +12962,7 @@ version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ced3678a2879b30306d323f4542626697a464a97c0a07c9aebf7ebca65cd4dde"
 dependencies = [
+ "serde",
  "zeroize_derive",
 ]
 

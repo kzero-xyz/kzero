@@ -81,7 +81,8 @@ substrate-build-script-utils = { git = "https://github.com/paritytech/polkadot-s
 substrate-frame-rpc-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503" }
 substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503" }
 # jwk
-jsonwebtoken = { git = "https://github.com/mimir-labs/jsonwebtoken", branch = "no_std_v9.3.0", default-features = false, features = ["codec"] }
+# jsonwebtoken = { git = "cccccccccccccc", branch = "no_std_v9.3.0", default-features = false, features = ["codec"] }
+jose-jwk = { path = "../JOSE/jose-jwk", default-features = false }
 
 # Local
 node-template = { path = "./node" }
