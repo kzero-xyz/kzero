@@ -12,22 +12,23 @@ use ark_bn254::Bn254;
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::{Groth16, Proof};
 // use base64ct::{Base64UrlUnpadded, Encoding};
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 
-use scale_codec::{Decode, Encode, MaxEncodedLen};
+use scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{H256, U256};
 use sp_std::vec::Vec;
 
 pub use error::{ZkAuthError, ZkAuthResult};
-pub use zk_input::{ZkLoginInputs, ZkLoginProof, Claim};
+pub use zk_input::{Claim, ZkLoginInputs, ZkLoginProof};
 
 // pub use jsonwebtoken::{
 //     errors::ErrorKind,
 //     jwk::{AlgorithmParameters, Jwk},
 // };
 
-pub use jose_jwk::{Jwk, Key};
+pub use jose_jwa::{Algorithm, Signing};
+pub use jose_jwk::{Jwk, Key, Parameters};
 
 mod circom;
 mod error;
@@ -56,9 +57,14 @@ pub fn jwk_from_slice(json: &[u8]) -> serde_json::Result<Jwk> {
     serde_json::from_slice(json)
 }
 
+pub fn jwk_to_json(jwk: &Jwk) -> serde_json::Result<Vec<u8>> {
+    serde_json::to_vec(jwk)
+}
+
 #[derive(
     Encode,
     Decode,
+    DecodeWithMemTracking,
     Debug,
     MaxEncodedLen,
     TypeInfo,
@@ -280,7 +286,6 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterialV1<Moment> {
         address_seed: &H256,
         jwk: &Jwk,
     ) -> ZkAuthResult<()> {
-
         // let modulus = if let AlgorithmParameters::RSA(ref key_params) = jwk.algorithm {
         //     // Decode modulus to bytes.
         //     // Base64UrlUnpadded::decode_vec(&key_params.n)
@@ -289,8 +294,7 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterialV1<Moment> {
         //     return Err(ZkAuthError::UnsupportedAlgorithm);
         // };
         let modulus = if let Key::Rsa(ref rsa) = jwk.key {
-            URL_SAFE_NO_PAD.decode(&rsa.n)
-                .map_err(|_| ZkAuthError::ModulusDecodeError)?
+            URL_SAFE_NO_PAD.decode(&rsa.n).map_err(|_| ZkAuthError::ModulusDecodeError)?
         } else {
             return Err(ZkAuthError::UnsupportedAlgorithm);
         };

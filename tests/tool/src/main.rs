@@ -3,14 +3,15 @@ use sp_core::{Pair, H256};
 use sp_runtime::generic::Era;
 // local
 use node_template::node_template_runtime::{
-    self, AccountId, Address, BalancesCall, Runtime, RuntimeCall, Signature, SignedExtra,
-    InnerSignedPayload, UncheckedExtrinsic, ZkLoginCall, InnerSignedExtra, InnerUncheckedExtrinsic
+    self, AccountId, Address, BalancesCall, InnerSignedExtra, InnerSignedPayload,
+    InnerUncheckedExtrinsic, Runtime, RuntimeCall, Signature, SignedExtra, UncheckedExtrinsic,
+    ZkLoginCall,
 };
-use sp_runtime::traits::ValidateUnsigned;
 use primitive_zklogin::{
     test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs, test_cases::google},
-    JwkProvider, ZkMaterialV1
+    JwkProvider, ZkMaterialV1,
 };
+use sp_runtime::traits::ValidateUnsigned;
 
 // must replace this genesis to your own
 const CHAIN_GENESIS: [u8; 32] =
@@ -90,5 +91,4 @@ fn main() {
     let outer_utx = UncheckedExtrinsic::new_unsigned(final_call);
 
     println!("outer tx\n0x{}", hex::encode(outer_utx.encode()))
-
 }

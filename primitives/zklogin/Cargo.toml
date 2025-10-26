@@ -36,11 +36,12 @@ sp-std = { workspace = true }
 
 # jwk
 # jsonwebtoken = { workspace = true }
+jose-jwa = { workspace = true, default-features = false }
 jose-jwk = { workspace = true, default-features = false }
 
 [dev-dependencies]
-serde = { workspace = true, features = ["std", "derive"] }
 rand = "0.8.5"
+serde = { workspace = true, features = ["std", "derive"] }
 
 [features]
 runtime-benchmarks = [

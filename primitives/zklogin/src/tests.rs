@@ -1,17 +1,23 @@
-use crate::test_helper::test_cases::poseidon_hash::{
-    POSEIDON_0_TO_29, POSEIDON_0_TO_32, POSEIDON_1, POSEIDON_1_2, POSEIDON_1_TO_15,
-    POSEIDON_1_TO_16,
-};
-use crate::test_helper::test_cases::valid_affine::{
-    E, INVALID_TYPE_VALUES, INVALID_VALUES, VK_ALPHA_1, VK_BETA_2, VK_DELTA_2, VK_GAMMA_2,
-};
-use crate::traits::{ReplaceSender, TryIntoEphPubKey};
 use crate::{
     circom::{
         unsafe_g1_affine_from_str_projective, unsafe_g2_affine_from_str_projective, StrCircomG1,
         StrCircomG2,
     },
-    test_helper::{get_raw_data, get_zklogin_inputs, test_cases::google},
+    test_helper::{
+        get_raw_data, get_zklogin_inputs,
+        test_cases::{
+            google,
+            poseidon_hash::{
+                POSEIDON_0_TO_29, POSEIDON_0_TO_32, POSEIDON_1, POSEIDON_1_2, POSEIDON_1_TO_15,
+                POSEIDON_1_TO_16,
+            },
+            valid_affine::{
+                E, INVALID_TYPE_VALUES, INVALID_VALUES, VK_ALPHA_1, VK_BETA_2, VK_DELTA_2,
+                VK_GAMMA_2,
+            },
+        },
+    },
+    traits::{ReplaceSender, TryIntoEphPubKey},
     JwkProvider, ZkMaterial, ZkMaterialV1,
 };
 use ark_bn254::Bn254;

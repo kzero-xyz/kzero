@@ -1,15 +1,15 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmark_data;
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 
 mod jwk;
 mod offchain_worker;
 #[cfg(test)]
 mod tests;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmark_data;
 
 pub mod weights;
 
@@ -21,12 +21,13 @@ use frame_support::{
     dispatch::{
         DispatchClass, DispatchInfo, DispatchResultWithPostInfo, GetDispatchInfo, PostDispatchInfo,
     },
-    traits::{Time, IsSubType},
-    RuntimeDebugNoBound,
+    traits::{IsSubType, Time},
+    BoundedVec, RuntimeDebugNoBound,
 };
 use sp_runtime::{
     traits::{
-        AsSystemOriginSigner, DispatchInfoOf, Dispatchable, PostDispatchInfoOf, StaticLookup, TransactionExtension,
+        AsSystemOriginSigner, DispatchInfoOf, Dispatchable, PostDispatchInfoOf,
+        TransactionExtension,
     },
     transaction_validity::{
         InvalidTransaction, TransactionSource, TransactionValidity, TransactionValidityError,
@@ -36,20 +37,19 @@ use sp_runtime::{
 };
 use sp_std::prelude::*;
 
-use primitive_zklogin::{Jwk, JwkProvider, Kid, ZkMaterial};
+use primitive_zklogin::{JwkProvider, Kid, ZkMaterial};
 
 use crate::offchain_worker::JwksPayload;
 // re-export
 pub use crate::offchain_worker::crypto;
 pub use weights::WeightInfo;
 
-type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
-
 const TARGET: &str = "runtime::zklogin";
 
 pub use pallet::*;
 
 pub type MomentOf<T> = <<T as Config>::Time as Time>::Moment;
+pub type JsonStr<Limit> = BoundedVec<u8, Limit>;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -77,6 +77,9 @@ pub mod pallet {
             + IsSubType<Call<Self>>
             + IsType<<Self as frame_system::Config>::RuntimeCall>;
 
+        /// The maximum size of a JWK JSON payload.
+        type JwkJsonLimit: Get<u32> + scale_codec::Codec + TypeInfo;
+
         /// The identifier type for an offchain worker.
         type AuthorityId: AppCrypto<Self::Public, Self::Signature>; // + Parameter + MaxEncodedLen;
 
@@ -101,7 +104,7 @@ pub mod pallet {
         /// Update Jwks for the provider.
         JwksUpdated {
             provider: JwkProvider,
-            jwks: Vec<Jwk>,
+            // jwks: Vec<Jwk>,
         },
 
         /// Current keys that allow to set Jwks.
@@ -114,16 +117,12 @@ pub mod pallet {
     pub enum Error<T> {
         /// Ephemeral key is is expired.
         EphKeyExpired,
-        /// Converted from Error `InvalidTransaction`
-        /// No need to get any detailed error here.
-        InvalidTransaction,
-        /// Converted from Error `UnknownTransaction`
-        UnknownTransactionCannotLookup,
-        UnknownTransactionNoUnsignedValidator,
-        UnknownTransactionCustom,
-
+        /// Jwk JSON is too large to fit in BoundedVec.
+        JwkJsonTooLarge,
         /// Parse json to Jwk struct error.
         InvalidJwkJson,
+        /// Convert Jwk to json to error.
+        InvalidJwk,
     }
 
     #[pallet::pallet]
@@ -131,15 +130,21 @@ pub mod pallet {
 
     /// The current set of keys that may submit an offchain extrinsic.
     #[pallet::storage]
-    // TODO we need more code to bond `T::Public: MaxEncodedLen`, then we can remove `#[pallet::unbounded]`. While if using `#[pallet::unbounded]`, `WeakBoundedVec` is useless.
+    // TODO we need more code to bond `T::Public: MaxEncodedLen`, then we can remove `#[pallet::unbounded]`.
     #[pallet::unbounded]
     pub type Keys<T: Config> = StorageValue<_, WeakBoundedVec<T::Public, T::MaxKeys>, ValueQuery>;
 
-    /// TODO
+    /// The on-chain Jwk JSONs, indexed by (provider, kid).
     #[pallet::storage]
     #[pallet::unbounded]
-    pub(crate) type Jwks<T> =
-        StorageDoubleMap<_, Twox64Concat, JwkProvider, Twox64Concat, Kid, Jwk>;
+    pub(crate) type JwkJsons<T: Config> = StorageDoubleMap<
+        _,
+        Twox64Concat,
+        JwkProvider,
+        Twox64Concat,
+        Kid,
+        BoundedVec<u8, T::JwkJsonLimit>,
+    >;
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
@@ -188,7 +193,7 @@ pub mod pallet {
         #[pallet::weight(<T as Config>::WeightInfo::submit_jwks_unsigned(payload.jwks.len() as u32))]
         pub fn submit_jwks_unsigned(
             origin: OriginFor<T>,
-            payload: JwksPayload<T::Public, BlockNumberFor<T>>,
+            payload: JwksPayload<T::Public, BlockNumberFor<T>, T::JwkJsonLimit>,
             _signature: T::Signature,
         ) -> DispatchResultWithPostInfo {
             ensure_none(origin)?;
@@ -238,11 +243,10 @@ pub mod pallet {
         pub fn set_jwk(
             origin: OriginFor<T>,
             provider: JwkProvider,
-            json: Vec<u8>,
+            json: JsonStr<T::JwkJsonLimit>,
         ) -> DispatchResultWithPostInfo {
             ensure_root(origin)?;
-            let jwk = jwk::parse_jwk::<T>(&json)?;
-            Self::insert_jwks(provider, vec![jwk], false)?;
+            Self::insert_jwks(provider, vec![json], false)?;
             Ok(().into())
         }
     }
@@ -251,20 +255,25 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         fn insert_jwks(
             provider: JwkProvider,
-            jwks: Vec<Jwk>,
+            jwks: Vec<JsonStr<T::JwkJsonLimit>>,
             delete_before_insert: bool,
         ) -> Result<(), Error<T>> {
             if delete_before_insert {
                 // For normal, Jwks just contains a small group for a provider, so it's safe to set
                 // `32` as limit, while ignore the result.
-                let _ = Jwks::<T>::clear_prefix(provider, 32, None);
+                let _ = JwkJsons::<T>::clear_prefix(provider, 32, None);
             }
 
-            for jwk in jwks.iter() {
-                let kid = jwk.common.key_id.as_ref().ok_or(Error::<T>::InvalidJwkJson)?.as_bytes();
-                Jwks::<T>::insert(provider, kid, jwk);
+            for json in jwks.iter() {
+                let jwk = crate::jwk::parse_jwk::<T>(json.as_slice())?; // validate jwk json
+                let kid = jwk.prm.kid.as_ref().ok_or(Error::<T>::InvalidJwkJson)?.as_bytes();
+                // convert jwk to json again to make sure the stored json is standard
+                let jwk_json = crate::jwk::jwk_to_json::<T>(&jwk)?;
+                let bounded_json = BoundedVec::<u8, T::JwkJsonLimit>::try_from(jwk_json)
+                    .map_err(|_| Error::<T>::JwkJsonTooLarge)?;
+                JwkJsons::<T>::insert(provider, kid, bounded_json);
             }
-            Self::deposit_event(Event::JwksUpdated { provider, jwks });
+            Self::deposit_event(Event::JwksUpdated { provider });
 
             Ok(())
         }
@@ -285,58 +294,7 @@ pub mod pallet {
 
             // verify signature
             match call {
-                // Call::submit_zklogin_unsigned { uxt, address_seed, zk_material } => {
-                //     let (provider, kid) = zk_material.source();
-                //     // We require the provider and kid must exist on chain before submit extrinsic.
-                //     let jwk = Jwks::<T>::get(provider, kid)
-                //         .ok_or::<TransactionValidityError>(InvalidTransaction::Call.into())?;
-
-                //     // Only signed extrinsic is allowed
-                //     let eph_pubkey = match uxt.signature_payload() {
-                //         // This extrinsic is not a signed one.
-                //         None => return InvalidTransaction::Call.into(),
-                //         Some(payload) => {
-                //             payload.signature_address().try_into_eph_key().map_err::<TransactionValidityError, _>(|e| {
-                //                 log::warn!(target: TARGET, "The signer can not convert to a valid eph pubkey. err: {:?}", e);
-                //                 InvalidTransaction::BadSigner.into()
-                //             })?
-                //         }
-                //     };
-
-                //     // the zkLogin address that will pay for the tx fee and execute the real call
-                //     let address_seed = T::Lookup::lookup(address_seed.clone())?;
-
-                //     let encoded = uxt.encode();
-                //     let encoded_len = encoded.len();
-                //     // Check Signature
-                //     let mut xt = uxt.clone().check(&T::Context::default())?;
-
-                //     // IMPORTANT
-                //     // replace sender in CheckedExtrinsic
-                //     // This is due to zkLogin's mechanism, it uses `ephemeral key` to sign and submit tx
-                //     // while the real transaction is executed and transaction fee paid
-                //     // through the `zklogin_address` that is derived from JWT
-                //     xt.replace_sender(address_seed.clone());
-                //     // Decode parameters and dispatch
-                //     let dispatch_info = xt.get_dispatch_info();
-                //     // Check dispatch_class: mandatory extrinsic is not allowed to use zklogin
-                //     if dispatch_info.class == DispatchClass::Mandatory {
-                //         return InvalidTransaction::BadMandatory.into();
-                //     }
-
-                //     // validate zk proof
-                //     zk_material
-                //         .verify_zk_login(eph_pubkey, &address_seed, &jwk)
-                //         .map_err(|_| InvalidTransaction::BadProof)?;
-
-                //     let r = with_transaction::<TransactionValidity, DispatchError, _>(|| {
-                //         let result = xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len);
-                //         // must rollback for any case
-                //         TransactionOutcome::Rollback(Ok(result))
-                //     });
-                //     // discard this part
-                //     r.unwrap()
-                // }
+                // only check `submit_jwks_unsigned` call for we treat it as `inherent` for now.
                 Call::submit_jwks_unsigned { payload, signature } => {
                     let signature_valid =
                         SignedPayload::<T>::verify::<T::AuthorityId>(payload, signature.clone());
@@ -351,11 +309,23 @@ pub mod pallet {
                     for (provider, jwks) in payload.jwks.iter() {
                         let result = jwks
                             .iter()
-                            .map(|jwk| {
+                            .map(|json| {
+                                let jwk = match jwk::parse_jwk::<T>(json.as_slice()) {
+                                    Ok(jwk) => jwk,
+                                    Err(e) => {
+                                        let json_str = alloc::string::String::from_utf8_lossy(json.as_slice());
+                                        log::error!(target: TARGET, "The unsigned contains invalid Jwk. Parse jwk json err, json:{}, err: {:?}", json_str, e);
+                                        return None;
+                                    }
+                                };
+
                                 offchain_worker::check_jwk_not_onchain(
                                     *provider,
-                                    jwk,
-                                    |provider, kid| Jwks::<T>::get(provider, kid),
+                                    &jwk,
+                                    |provider, kid| {
+                                        JwkJsons::<T>::get(provider, kid)
+                                            .and_then(|json| jwk::parse_jwk::<T>(json.as_slice()).ok())
+                                    },
                                 )
                             })
                             .collect::<Vec<_>>();
@@ -388,41 +358,6 @@ pub mod pallet {
     }
 }
 
-// pub type CheckedOf<E, C> = <E as Checkable<C>>::Checked;
-
-// struct Executive<T>(sp_std::marker::PhantomData<T>);
-
-// impl<T: Config> Executive<T>
-// where
-//     T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
-//     <<T as Config>::Extrinsic as Extrinsic>::SignaturePayload: SignaturePayloadExt,
-//     <<<T as Config>::Extrinsic as Extrinsic>::SignaturePayload as SignaturePayload>::SignatureAddress: TryIntoEphPubKey,
-// {
-//     fn apply_extrinsic(
-//         uxt: Box<<T as Config>::Extrinsic>,
-//         address_seed: AccountIdLookupOf<T>,
-//     ) -> DispatchResultWithPostInfo {
-//         let encoded = uxt.encode();
-//         let encoded_len = encoded.len();
-
-//         // Verify that the signature is good.
-//         let mut xt = uxt.check(&T::Context::default()).expect("process ?");
-//         xt.replace_sender(T::Lookup::lookup(address_seed).expect("lookup should succeed"));
-
-//         let dispatch_info = xt.get_dispatch_info();
-//         let r = Applyable::apply::<T::UnsignedValidator>(xt, &dispatch_info, encoded_len)
-//             .map_err(Error::<T>::from)?;
-
-//         // For we has checked the `dispatch_info.class` in `validate_unsigned`, so the check at here is not
-//         // necessary. We keep this to be same implementation in `Executive`.
-//         if r.is_err() && dispatch_info.class == DispatchClass::Mandatory {
-//             return Err(Error::<T>::InvalidTransaction.into());
-//         }
-
-//         r
-//     }
-// }
-
 /// Operation to perform from `prepare` to `post_dispatch_details` in [`ZkLoginExtension`] transaction
 /// extension.
 #[derive(RuntimeDebugNoBound)]
@@ -439,10 +374,12 @@ pub struct ZkLoginExtension<T: Config + Send + Sync> {
     _phantom: core::marker::PhantomData<T>,
 }
 
-impl<T: Config + Send + Sync + core::fmt::Debug> TransactionExtension<<T as Config>::RuntimeCall> for ZkLoginExtension<T>
+impl<T: Config + Send + Sync + core::fmt::Debug> TransactionExtension<<T as Config>::RuntimeCall>
+    for ZkLoginExtension<T>
 where
     <T as Config>::RuntimeCall: Dispatchable<Info = DispatchInfo> + IsSubType<Call<T>>,
-    <<T as Config>::RuntimeCall as Dispatchable>::RuntimeOrigin: AsSystemOriginSigner<T::AccountId> + Clone,
+    <<T as Config>::RuntimeCall as Dispatchable>::RuntimeOrigin:
+        AsSystemOriginSigner<T::AccountId> + Clone,
     // TODO assume AccountId32 limit can be removed after checking zk logic
     T: frame_system::Config<AccountId = sp_core::crypto::AccountId32>,
 {
@@ -491,20 +428,25 @@ where
 
                 let (provider, kid) = zk_material.source();
                 // We require the provider and kid must exist on chain before submit extrinsic.
-                let jwk = Jwks::<T>::get(provider, kid)
+                let jwk_json = JwkJsons::<T>::get(provider, kid)
                     .ok_or::<TransactionValidityError>(InvalidTransaction::Call.into())?;
+                let jwk = jwk::parse_jwk::<T>(jwk_json.as_slice())
+                    .map_err(|_| InvalidTransaction::Call)?;
 
                 // validate zk proof
                 zk_material
                     .verify_zk_login(eph_pubkey, address_seed, &jwk)
                     .map_err(|_| InvalidTransaction::BadProof)?;
 
-
                 // TODO only support accountid: accountid32 now.
                 let zk_account: T::AccountId = sp_core::crypto::AccountId32::from(address_seed.0);
-                Ok((ValidTransaction::default(), Val::Checked, RawOrigin::Signed(zk_account).into()))
+                Ok((
+                    ValidTransaction::default(),
+                    Val::Checked,
+                    RawOrigin::Signed(zk_account).into(),
+                ))
             }
-            _ => Ok((ValidTransaction::default(),Val::Refund(self.weight(call)), origin)),
+            _ => Ok((ValidTransaction::default(), Val::Refund(self.weight(call)), origin)),
         }
     }
 
@@ -532,18 +474,3 @@ where
         }
     }
 }
-
-// impl<T: Config> From<TransactionValidityError> for Error<T> {
-//     fn from(value: TransactionValidityError) -> Self {
-//         match value {
-//             TransactionValidityError::Invalid(_) => Error::InvalidTransaction,
-//             TransactionValidityError::Unknown(u) => match u {
-//                 UnknownTransaction::CannotLookup => Error::UnknownTransactionCannotLookup,
-//                 UnknownTransaction::NoUnsignedValidator => {
-//                     Error::UnknownTransactionNoUnsignedValidator
-//                 }
-//                 UnknownTransaction::Custom(_) => Error::UnknownTransactionCustom,
-//             },
-//         }
-//     }
-// }

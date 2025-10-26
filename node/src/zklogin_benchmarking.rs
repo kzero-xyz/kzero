@@ -12,9 +12,9 @@ use sp_core::{Encode, Pair};
 use sp_inherents::{InherentData, InherentDataProvider};
 use sp_runtime::OpaqueExtrinsic;
 
+use primitive_zklogin::test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs};
 use sp_runtime::generic::Era;
 use std::{sync::Arc, time::Duration};
-use primitive_zklogin::test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs};
 
 /// Generates extrinsics for the `benchmark overhead` command.
 ///

@@ -1,13 +1,11 @@
 use crate::{Call as ZkLoginCall, Pallet};
 use frame_executive::Executive;
-use frame_support::weights::IdentityFee;
-use frame_support::weights::WeightToFee;
 use frame_support::{
     assert_ok, derive_impl,
-    dispatch::GetDispatchInfo,
-    dispatch::RawOrigin,
+    dispatch::{GetDispatchInfo, RawOrigin},
     parameter_types,
     traits::{Currency, Get, UnfilteredDispatchable},
+    weights::{IdentityFee, WeightToFee},
 };
 use pallet_balances::Call as BalancesCall;
 use primitive_zklogin::{
@@ -395,8 +393,7 @@ fn test_parse_jwk_success() {
 
 #[test]
 fn test_parse_jwk_missing_required_fields() {
-    use crate::jwk::parse_jwk;
-    use crate::pallet::Error;
+    use crate::{jwk::parse_jwk, pallet::Error};
     // Set log level to error to suppress error messages
     log::set_max_level(log::LevelFilter::Error);
 
@@ -437,9 +434,12 @@ fn test_parse_jwk_with_google_format() {
     assert!(result.is_ok());
 
     let jwk = result.unwrap();
-    assert!(jwk.common.key_id.is_some());
-    assert_eq!(jwk.common.key_id.as_ref().unwrap(), "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781");
-    assert_eq!(jwk.common.key_algorithm, Some(jsonwebtoken::jwk::KeyAlgorithm::RS256));
+    assert!(jwk.prm.kid.is_some());
+    assert_eq!(jwk.prm.kid.as_ref().unwrap(), "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781");
+    assert!(matches!(
+        jwk.prm.alg,
+        Some(primitive_zklogin::Algorithm::Signing(primitive_zklogin::Signing::Rs256))
+    ));
 }
 
 // ================================ offchain worker tests ================================
@@ -447,8 +447,10 @@ fn test_parse_jwk_with_google_format() {
 fn test_fetch_jwks() {
     use crate::offchain_worker::fetch_jwks;
     use primitive_zklogin::JwkProvider;
-    use sp_core::offchain::testing::PendingRequest;
-    use sp_core::offchain::{testing::TestOffchainExt, OffchainDbExt, OffchainWorkerExt};
+    use sp_core::offchain::{
+        testing::{PendingRequest, TestOffchainExt},
+        OffchainDbExt, OffchainWorkerExt,
+    };
     use sp_io::TestExternalities;
 
     // Create test externalities with offchain worker context
@@ -546,14 +548,13 @@ fn test_check_jwk_not_onchain_when_different_content() {
 fn test_set_jwk() {
     use crate::pallet::Error;
     use frame_support::assert_noop;
-    use primitive_zklogin::Jwk;
-    use primitive_zklogin::{test_helper::test_cases::google, JwkProvider};
+    use primitive_zklogin::{test_helper::test_cases::google, Jwk, JwkProvider};
     use sp_runtime::DispatchError;
 
     let valid_jwk = google::GOOGLE_JWK_JSON_LIST[0];
     let provider = JwkProvider::Google;
     let jwk: Jwk = serde_json::from_str(valid_jwk).unwrap();
-    let kid = jwk.common.key_id.as_ref().unwrap().as_bytes();
+    let kid = jwk.prm.kid.as_ref().unwrap().as_bytes();
 
     let mut ext = new_test_ext();
     ext.execute_with(|| {
@@ -561,7 +562,7 @@ fn test_set_jwk() {
         log::set_max_level(log::LevelFilter::Off);
 
         // Check that JWK doesn't exist before setting
-        assert!(crate::Jwks::<Test>::get(provider, kid).is_none());
+        assert!(crate::JwkJsons::<Test>::get(provider, kid).is_none());
 
         // Test valid JWK setting by root
         assert_ok!(ZkLogin::set_jwk(
@@ -571,9 +572,10 @@ fn test_set_jwk() {
         ));
 
         // Check that JWK exists after setting
-        let stored_jwk = crate::Jwks::<Test>::get(provider, kid).unwrap();
+        let stored_jwk_json = crate::JwkJsons::<Test>::get(provider, kid).unwrap();
+        let stored_jwk = crate::jwk::parse_jwk::<Test>(stored_jwk_json.as_slice()).unwrap();
         assert_eq!(
-            stored_jwk.common.key_id.as_ref().unwrap(),
+            stored_jwk.prm.kid.as_ref().unwrap(),
             "1f40f0a8ef3d880978dc82f25c3ec317c6a5b781"
         );
 
@@ -602,11 +604,9 @@ fn test_set_jwk() {
 
 #[test]
 fn test_update_keys() {
-    use frame_support::assert_noop;
-    use frame_support::assert_ok;
+    use frame_support::{assert_noop, assert_ok};
     use sp_core::ed25519;
-    use sp_runtime::DispatchError;
-    use sp_runtime::MultiSigner;
+    use sp_runtime::{DispatchError, MultiSigner};
 
     new_test_ext().execute_with(|| {
         // Generate test keys
@@ -663,8 +663,7 @@ fn test_submit_jwks_unsigned() {
     use frame_support::assert_noop;
     use primitive_zklogin::{Jwk, JwkProvider};
     use sp_core::ed25519;
-    use sp_runtime::DispatchError;
-    use sp_runtime::MultiSigner;
+    use sp_runtime::{DispatchError, MultiSigner};
 
     // Set log level to off to suppress error messages
     log::set_max_level(log::LevelFilter::Off);
@@ -717,8 +716,8 @@ fn test_submit_jwks_unsigned() {
         // Verify JWKs were stored
         let kid1 = jwk1.common.key_id.as_ref().unwrap().as_bytes();
         let kid2 = jwk2.common.key_id.as_ref().unwrap().as_bytes();
-        assert!(crate::Jwks::<Test>::get(JwkProvider::Google, kid1).is_some());
-        assert!(crate::Jwks::<Test>::get(JwkProvider::Apple, kid2).is_some());
+        assert!(crate::JwkJsons::<Test>::get(JwkProvider::Google, kid1).is_some());
+        assert!(crate::JwkJsons::<Test>::get(JwkProvider::Apple, kid2).is_some());
 
         // Test invalid origin (must be None)
         assert_noop!(
@@ -819,8 +818,7 @@ fn test_submit_zklogin_unsigned() {
 fn should_weight_the_same() {
     use crate::Call as ZkLoginCall;
     use sp_core::ed25519;
-    use sp_runtime::traits::ValidateUnsigned;
-    use sp_runtime::MultiSignature;
+    use sp_runtime::{traits::ValidateUnsigned, MultiSignature};
 
     // 1. frame_system::remark - (direct call)
     let weight1 = {

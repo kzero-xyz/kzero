@@ -68,13 +68,13 @@ frame-try-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch
 pallet-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
 pallet-balances = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
 pallet-grandpa = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
+pallet-proxy = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
+pallet-recovery = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
 pallet-sudo = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
 pallet-timestamp = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
 pallet-transaction-payment = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
 pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503" }
 pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
-pallet-proxy = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
-pallet-recovery = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503", default-features = false }
 # Substrate (Utility)
 frame-benchmarking-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503" }
 substrate-build-script-utils = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503" }
@@ -82,7 +82,8 @@ substrate-frame-rpc-system = { git = "https://github.com/paritytech/polkadot-sdk
 substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2503" }
 # jwk
 # jsonwebtoken = { git = "cccccccccccccc", branch = "no_std_v9.3.0", default-features = false, features = ["codec"] }
-jose-jwk = { path = "../JOSE/jose-jwk", default-features = false }
+jose-jwa = { version = "0.1.2", default-features = false }
+jose-jwk = { version = "0.1.2", default-features = false }
 
 # Local
 node-template = { path = "./node" }

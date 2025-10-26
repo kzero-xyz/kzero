@@ -1,8 +1,6 @@
 use sp_core::crypto::AccountId32;
 
-use sp_runtime::{
-    MultiAddress,
-};
+use sp_runtime::MultiAddress;
 
 use crate::EphPubKey;
 
