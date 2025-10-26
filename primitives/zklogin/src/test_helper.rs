@@ -208,7 +208,8 @@ pub fn get_raw_data() -> (AccountId32, String, u64, [u8; 32]) {
     .unwrap();
 
     let address_u256 = U256::from_dec_str(&address_seed).expect("");
-    let s: [u8; 32] = address_u256.into();
+    // TODO not sure for this.
+    let s: [u8; 32] = address_u256.to_little_endian();
     let address_seed = AccountId32::from(s);
 
     let proof_data = r#"{
@@ -310,7 +311,7 @@ pub mod test_cases {
             jwks(is_valid)
                 .into_iter()
                 .map(|jwk| {
-                    jwk.common.key_id.expect("Test case JWK must has kid").as_bytes().to_vec()
+                    jwk.prm.kid.expect("Test case JWK must has kid").as_bytes().to_vec()
                 })
                 .collect()
         }
