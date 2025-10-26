@@ -12,7 +12,7 @@ use sp_runtime::{
 use sp_std::vec::Vec;
 
 // zklogin and local
-use crate::{Call, Config, JsonStr, JwkJsons, Keys};
+use crate::{Call, Config, JwkJsons, Keys};
 use primitive_zklogin::{Jwk, JwkProvider, JwkProviderErr};
 
 const TARGET: &str = "offchain-worker::zklogin";
@@ -119,19 +119,22 @@ pub fn offchain_worker_entrypoint<T: Config>(block_number: BlockNumberFor<T>) {
     }).collect::<Vec<_>>();
 
     let prepared_jwks = prepared_jwks.into_iter().filter_map(|(provider, jwks)| {
-        let bounded_jwks: Vec<JsonStr<T::JwkJsonLimit>> = jwks.into_iter().filter_map(|jwk| {
+        let jwk_jsons: Vec<Vec<u8>> = jwks.into_iter().filter_map(|jwk| {
             let json = primitive_zklogin::jwk_to_json(&jwk).map_err(|e| {
                 log::error!(target: TARGET, "Serialize Jwk to json err, provider: {:?}, e: {:?}", provider, e);
             }).ok()?;
-            JsonStr::<T::JwkJsonLimit>::try_from(json).map_err(|_| {
-                log::error!(target: TARGET, "Jwk json size exceed limit: {}, provider: {:?}.", T::JwkJsonLimit::get(), provider);
-            }).ok()
+
+            if json.len() > T::JwkJsonLimit::get() as usize {
+                log::error!(target: TARGET, "Jwk json size exceed limit for provider:{:?}. Ignore this Jwk. size: {}, limit: {}", provider, json.len(), T::JwkJsonLimit::get());
+                return None;
+            }
+            Some(json)
         }).collect();
-        if bounded_jwks.is_empty() {
+        if jwk_jsons.is_empty() {
             log::debug!(target: TARGET, "After bounded, no Jwk for this provider:{:?}.", provider);
             None
         } else {
-            Some((provider, bounded_jwks))
+            Some((provider, jwk_jsons))
         }
     }).collect::<Vec<_>>();
 
@@ -151,76 +154,52 @@ pub fn offchain_worker_entrypoint<T: Config>(block_number: BlockNumberFor<T>) {
 
 /// Payload used by this example crate to hold price
 /// data required to submit a transaction.
-#[derive(Encode, Decode, DecodeWithMemTracking, scale_info::TypeInfo)]
-pub struct JwksPayload<Public, BlockNumber, Limit: Get<u32>> {
-    pub jwks: Vec<(JwkProvider, Vec<JsonStr<Limit>>)>,
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, scale_info::TypeInfo)]
+pub struct JwksPayload<Public, BlockNumber> {
+    pub jwks: Vec<(JwkProvider, Vec<Vec<u8>>)>,
     pub block_number: BlockNumber,
     pub public: Public,
 }
 
-impl<Public: Clone, BlockNumber: Clone, Limit: Get<u32>> Clone
-    for JwksPayload<Public, BlockNumber, Limit>
-{
-    fn clone(&self) -> Self {
-        Self {
-            jwks: self.jwks.clone(),
-            block_number: self.block_number.clone(),
-            public: self.public.clone(),
-        }
-    }
-}
-
-impl<Public: PartialEq, BlockNumber: PartialEq, Limit: Get<u32>> PartialEq
-    for JwksPayload<Public, BlockNumber, Limit>
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.jwks == other.jwks
-            && self.block_number == other.block_number
-            && self.public == other.public
-    }
-}
-
-impl<Public: Eq, BlockNumber: Eq, Limit: Get<u32>> Eq for JwksPayload<Public, BlockNumber, Limit> {}
-
-impl<Public: core::fmt::Debug, BlockNumber: core::fmt::Debug, Limit: Get<u32>> core::fmt::Debug
-    for JwksPayload<Public, BlockNumber, Limit>
+impl<Public: core::fmt::Debug, BlockNumber: core::fmt::Debug> core::fmt::Debug
+    for JwksPayload<Public, BlockNumber>
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        struct JwksDebugHelper<'a, Limit: Get<u32>>(&'a Vec<(JwkProvider, Vec<JsonStr<Limit>>)>);
+        struct JwksDebugHelper<'a>(&'a Vec<(JwkProvider, Vec<Vec<u8>>)>);
 
-        impl<'a, Limit: Get<u32>> core::fmt::Debug for JwksDebugHelper<'a, Limit> {
+        impl<'a> core::fmt::Debug for JwksDebugHelper<'a> {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                use alloc::string::String;
-
                 let mut list = f.debug_list();
-                for (provider, json_strs) in self.0.iter() {
-                    struct Entry<'b, Limit: Get<u32>> {
+                for (provider, json_vec) in self.0.iter() {
+                    struct Entry<'b> {
                         provider: &'b JwkProvider,
-                        json_strs: &'b [JsonStr<Limit>],
+                        json_vec: &'b [Vec<u8>],
                     }
-                    impl<'b, Limit: Get<u32>> core::fmt::Debug for Entry<'b, Limit> {
+                    impl<'b> core::fmt::Debug for Entry<'b> {
                         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                             let mut tuple = f.debug_tuple("");
                             tuple.field(&self.provider);
 
-                            struct JsonStrsDebug<'c, Limit: Get<u32>>(&'c [JsonStr<Limit>]);
-                            impl<'c, Limit: Get<u32>> core::fmt::Debug for JsonStrsDebug<'c, Limit> {
+                            struct JsonVecDebug<'c>(&'c [Vec<u8>]);
+                            impl<'c> core::fmt::Debug for JsonVecDebug<'c> {
                                 fn fmt(
                                     &self,
                                     f: &mut core::fmt::Formatter<'_>,
                                 ) -> core::fmt::Result {
                                     let mut list = f.debug_list();
-                                    for json_str in self.0.iter() {
-                                        list.entry(&String::from_utf8_lossy(json_str.as_slice()));
+                                    for json_bytes in self.0.iter() {
+                                        let json_str =
+                                            alloc::string::String::from_utf8_lossy(json_bytes);
+                                        list.entry(&json_str);
                                     }
                                     list.finish()
                                 }
                             }
-                            tuple.field(&JsonStrsDebug(self.json_strs));
+                            tuple.field(&JsonVecDebug(self.json_vec));
                             tuple.finish()
                         }
                     }
-                    list.entry(&Entry { provider, json_strs });
+                    list.entry(&Entry { provider, json_vec });
                 }
                 list.finish()
             }
@@ -235,7 +214,7 @@ impl<Public: core::fmt::Debug, BlockNumber: core::fmt::Debug, Limit: Get<u32>> c
 }
 
 impl<T: SigningTypes + crate::Config> SignedPayload<T>
-    for JwksPayload<T::Public, BlockNumberFor<T>, T::JwkJsonLimit>
+    for JwksPayload<T::Public, BlockNumberFor<T>>
 {
     fn public(&self) -> T::Public {
         self.public.clone()
@@ -244,7 +223,7 @@ impl<T: SigningTypes + crate::Config> SignedPayload<T>
 
 fn submit_unsigned<T: Config>(
     block_number: BlockNumberFor<T>,
-    jwks: Vec<(JwkProvider, Vec<JsonStr<T::JwkJsonLimit>>)>,
+    jwks: Vec<(JwkProvider, Vec<Vec<u8>>)>,
 ) -> Result<(), &'static str> {
     // -- Sign using any account
     let (_, result) = Signer::<T, T::AuthorityId>::any_account()

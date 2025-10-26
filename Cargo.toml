@@ -16,6 +16,7 @@ homepage = "https://kzero.xyz"
 repository = "https://github.com/kzero-xyz/kzero"
 
 [workspace.dependencies]
+log = { version = "0.4.22", default-features = false }
 scale-codec = { package = "parity-scale-codec", version = "3.7.4", default-features = false }
 scale-info = { version = "2.9.0", default-features = false }
 serde = { version = "1.0.194", default-features = false, features = ["alloc", "derive"] }

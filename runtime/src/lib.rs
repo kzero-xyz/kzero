@@ -1,20 +1,25 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
+
+extern crate alloc;
+
 // Make the WASM binary available.
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use pallet_grandpa::AuthorityId as GrandpaId;
-use scale_codec::{Decode, Encode, MaxEncodedLen};
+use scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
-    create_runtime_str, generic, impl_opaque_keys,
-    traits::{self, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, Verify},
+    generic, impl_opaque_keys,
+    traits::{
+        self, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, StaticLookup, Verify,
+    },
     transaction_validity::{TransactionSource, TransactionValidity},
-    ApplyExtrinsicResult, MultiSignature,
+    ApplyExtrinsicResult, MultiSignature, SaturatedConversion,
 };
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
@@ -98,19 +103,18 @@ pub mod opaque {
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-    spec_name: create_runtime_str!("node-template"),
-    impl_name: create_runtime_str!("node-template"),
+    spec_name: alloc::borrow::Cow::Borrowed("node-template"),
+    impl_name: alloc::borrow::Cow::Borrowed("node-template"),
     authoring_version: 1,
-    // The version of the zksig specification. A full node will not attempt to use its native
-    //   zksig in substitute for the on-chain Wasm zksig unless all of `spec_name`,
-    //   `spec_version`, and `authoring_version` are the same between Wasm and native.
-    // This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
-    //   the compatible custom types.
+    // Per convention: if the runtime behavior changes, increment spec_version
+    // and set impl_version to 0. If only runtime
+    // implementation changes and behavior does not, then leave spec_version as
+    // is and increment impl_version.
     spec_version: 100,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
-    state_version: 1,
+    system_version: 1,
 };
 
 /// This determines the average expected block time that we are targeting.
@@ -187,12 +191,69 @@ impl frame_system::offchain::SigningTypes for Runtime {
     type Signature = Signature;
 }
 
-impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
+where
+    RuntimeCall: From<LocalCall>,
+{
+    fn create_signed_transaction<
+        C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>,
+    >(
+        call: RuntimeCall,
+        public: <Signature as traits::Verify>::Signer,
+        account: AccountId,
+        nonce: Nonce,
+    ) -> Option<UncheckedExtrinsic> {
+        let tip = 0;
+        // take the biggest period possible.
+        let period =
+            BlockHashCount::get().checked_next_power_of_two().map(|c| c / 2).unwrap_or(2) as u64;
+        let current_block = System::block_number()
+            .saturated_into::<u64>()
+            // The `System::block_number` is initialized with `n+1`,
+            // so the actual block number is `n`.
+            .saturating_sub(1);
+        let era = sp_runtime::generic::Era::mortal(period, current_block);
+        let tx_ext: TxExtension = (
+            frame_system::CheckNonZeroSender::<Runtime>::new(),
+            frame_system::CheckSpecVersion::<Runtime>::new(),
+            frame_system::CheckTxVersion::<Runtime>::new(),
+            frame_system::CheckGenesis::<Runtime>::new(),
+            frame_system::CheckEra::<Runtime>::from(era),
+            pallet_zklogin::ZkLoginExtension::<Runtime>::new(),
+            frame_system::CheckNonce::<Runtime>::from(nonce),
+            frame_system::CheckWeight::<Runtime>::new(),
+            pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+        );
+
+        let raw_payload = SignedPayload::new(call, tx_ext)
+            .map_err(|e| {
+                log::warn!("Unable to create signed payload: {:?}", e);
+            })
+            .ok()?;
+        let signature = raw_payload.using_encoded(|payload| C::sign(payload, public))?;
+        let address = <Runtime as frame_system::Config>::Lookup::unlookup(account);
+        let (call, tx_ext, _) = raw_payload.deconstruct();
+        let transaction =
+            generic::UncheckedExtrinsic::new_signed(call, address, signature, tx_ext).into();
+        Some(transaction)
+    }
+}
+
+impl<LocalCall> frame_system::offchain::CreateInherent<LocalCall> for Runtime
+where
+    RuntimeCall: From<LocalCall>,
+{
+    fn create_inherent(call: RuntimeCall) -> UncheckedExtrinsic {
+        generic::UncheckedExtrinsic::new_bare(call).into()
+    }
+}
+
+impl<C> frame_system::offchain::CreateTransactionBase<C> for Runtime
 where
     RuntimeCall: From<C>,
 {
     type Extrinsic = UncheckedExtrinsic;
-    type OverarchingCall = RuntimeCall;
+    type RuntimeCall = RuntimeCall;
 }
 
 impl pallet_aura::Config for Runtime {
@@ -242,6 +303,7 @@ impl pallet_balances::Config for Runtime {
     type MaxFreezes = ();
     type RuntimeHoldReason = ();
     type RuntimeFreezeReason = ();
+    type DoneSlashHandler = ();
 }
 
 parameter_types! {
@@ -256,6 +318,7 @@ impl pallet_transaction_payment::Config for Runtime {
     type WeightToFee = IdentityFee<Balance>;
     type LengthToFee = IdentityFee<Balance>;
     type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
+    type WeightInfo = pallet_transaction_payment::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_sudo::Config for Runtime {
@@ -266,6 +329,7 @@ impl pallet_sudo::Config for Runtime {
 
 parameter_types! {
     pub const MaxKeys: u32 = 3;
+    pub const JwkJsonLimit: u32 = 2 * 1024; // 2 KB
 }
 
 impl pallet_zklogin::Config for Runtime {
@@ -273,17 +337,13 @@ impl pallet_zklogin::Config for Runtime {
 
     type MaxKeys = MaxKeys;
     type RuntimeEvent = RuntimeEvent;
-    type Extrinsic = InnerUncheckedExtrinsic;
-
-    type CheckedExtrinsic =
-        <InnerUncheckedExtrinsic as sp_runtime::traits::Checkable<Self::Context>>::Checked;
-
-    type UnsignedValidator = Runtime;
-
-    type Context = frame_system::ChainContext<Runtime>;
 
     type Time = Timestamp;
     type WeightInfo = pallet_zklogin::weights::SubstrateWeight<Runtime>;
+
+    type RuntimeCall = RuntimeCall;
+
+    type JwkJsonLimit = JwkJsonLimit;
 }
 
 pub const MILLICENTS: Balance = 1_000_000_000;
@@ -314,6 +374,7 @@ parameter_types! {
     PartialOrd,
     Encode,
     Decode,
+    DecodeWithMemTracking,
     RuntimeDebug,
     MaxEncodedLen,
     scale_info::TypeInfo
@@ -385,6 +446,7 @@ impl pallet_proxy::Config for Runtime {
     type CallHasher = BlakeTwo256;
     type AnnouncementDepositBase = AnnouncementDepositBase;
     type AnnouncementDepositFactor = AnnouncementDepositFactor;
+    type BlockNumberProvider = frame_system::Pallet<Runtime>;
 }
 
 parameter_types! {
@@ -403,6 +465,7 @@ impl pallet_recovery::Config for Runtime {
     type FriendDepositFactor = FriendDepositFactor;
     type MaxFriends = MaxFriends;
     type RecoveryDeposit = RecoveryDeposit;
+    type BlockNumberProvider = frame_system::Pallet<Runtime>;
 }
 // Create the zksig by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -428,26 +491,15 @@ pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
 /// Block type as expected by this zksig.
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 /// The SignedExtension to the basic transaction logic.
-pub type SignedExtra = (
+pub type TxExtension = (
     frame_system::CheckNonZeroSender<Runtime>,
     frame_system::CheckSpecVersion<Runtime>,
     frame_system::CheckTxVersion<Runtime>,
     frame_system::CheckGenesis<Runtime>,
     frame_system::CheckEra<Runtime>,
+    pallet_zklogin::ZkLoginExtension<Runtime>,
     frame_system::CheckNonce<Runtime>,
     frame_system::CheckWeight<Runtime>,
-    pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
-);
-
-// For the inner transaction, we avoid the checkWeight, only do the charge
-// When create the innerSignedPayload, we use the innerSignedExtra(which use the chargeTransactionPayment only)
-pub type InnerSignedExtra = (
-    frame_system::CheckNonZeroSender<Runtime>,
-    frame_system::CheckSpecVersion<Runtime>,
-    frame_system::CheckTxVersion<Runtime>,
-    frame_system::CheckGenesis<Runtime>,
-    frame_system::CheckEra<Runtime>,
-    frame_system::CheckNonce<Runtime>,
     pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
 );
 
@@ -459,16 +511,10 @@ type Migrations = ();
 
 /// Unchecked extrinsic type as expected by this zksig.
 pub type UncheckedExtrinsic =
-    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
-
-pub type InnerUncheckedExtrinsic =
-    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, InnerSignedExtra>;
+    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, TxExtension>;
 
 /// The payload being signed in transactions.
-pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
-
-// for inner transaction, we use the innerSignedPayload(which use the innerSignedExtra)
-pub type InnerSignedPayload = generic::SignedPayload<RuntimeCall, InnerSignedExtra>;
+pub type SignedPayload = generic::SignedPayload<RuntimeCall, TxExtension>;
 
 /// Executive: handles dispatch to the various modules.
 pub type Executive = frame_executive::Executive<

@@ -200,7 +200,7 @@ impl Default for ZkLoginEnv {
 pub type ZkMaterial<Moment> = VersionedZkMaterial<Moment>;
 
 /// ZkMaterial with versioned prefix.
-#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq, Eq)]
+#[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Clone, PartialEq, Eq)]
 pub enum VersionedZkMaterial<Moment> {
     V1(ZkMaterialV1<Moment>),
 }
@@ -240,7 +240,7 @@ impl<Moment> From<ZkMaterialV1<Moment>> for VersionedZkMaterial<Moment> {
 }
 
 /// The material that is used for zkproof verification (Version 1)
-#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq, Eq)]
+#[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, Clone, PartialEq, Eq)]
 pub struct ZkMaterialV1<Moment> {
     // source: (JwkProvider, Kid),
     /// (JwkProvider,kid) that is used to get the corresponding `n`, which

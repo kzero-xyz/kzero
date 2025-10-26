@@ -78,7 +78,7 @@ pub mod pallet {
             + IsType<<Self as frame_system::Config>::RuntimeCall>;
 
         /// The maximum size of a JWK JSON payload.
-        type JwkJsonLimit: Get<u32> + scale_codec::Codec + TypeInfo;
+        type JwkJsonLimit: Get<u32>;
 
         /// The identifier type for an offchain worker.
         type AuthorityId: AppCrypto<Self::Public, Self::Signature>; // + Parameter + MaxEncodedLen;
@@ -193,7 +193,7 @@ pub mod pallet {
         #[pallet::weight(<T as Config>::WeightInfo::submit_jwks_unsigned(payload.jwks.len() as u32))]
         pub fn submit_jwks_unsigned(
             origin: OriginFor<T>,
-            payload: JwksPayload<T::Public, BlockNumberFor<T>, T::JwkJsonLimit>,
+            payload: JwksPayload<T::Public, BlockNumberFor<T>>,
             _signature: T::Signature,
         ) -> DispatchResultWithPostInfo {
             ensure_none(origin)?;
@@ -243,7 +243,7 @@ pub mod pallet {
         pub fn set_jwk(
             origin: OriginFor<T>,
             provider: JwkProvider,
-            json: JsonStr<T::JwkJsonLimit>,
+            json: Vec<u8>,
         ) -> DispatchResultWithPostInfo {
             ensure_root(origin)?;
             Self::insert_jwks(provider, vec![json], false)?;
@@ -255,7 +255,7 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         fn insert_jwks(
             provider: JwkProvider,
-            jwks: Vec<JsonStr<T::JwkJsonLimit>>,
+            jwks: Vec<Vec<u8>>,
             delete_before_insert: bool,
         ) -> Result<(), Error<T>> {
             if delete_before_insert {
@@ -372,6 +372,13 @@ pub enum Val {
 #[scale_info(skip_type_params(T))]
 pub struct ZkLoginExtension<T: Config + Send + Sync> {
     _phantom: core::marker::PhantomData<T>,
+}
+
+impl<T: Config + Send + Sync> ZkLoginExtension<T> {
+    /// Creates new `TransactionExtension` to check zklogin proof.
+    pub fn new() -> Self {
+        Self { _phantom: core::marker::PhantomData }
+    }
 }
 
 impl<T: Config + Send + Sync + core::fmt::Debug> TransactionExtension<<T as Config>::RuntimeCall>
