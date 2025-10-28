@@ -208,8 +208,7 @@ pub fn get_raw_data() -> (H256, String, u64, [u8; 32]) {
     .unwrap();
 
     let address_u256 = U256::from_dec_str(&address_seed).expect("");
-    // TODO not sure for this.
-    let s: [u8; 32] = address_u256.to_little_endian();
+    let s: [u8; 32] = address_u256.to_big_endian();
     let address_seed = s.into();
 
     let proof_data = r#"{

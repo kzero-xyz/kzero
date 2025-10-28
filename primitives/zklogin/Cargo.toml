@@ -13,9 +13,6 @@ serde_json = { workspace = true }
 # encode/decode
 scale-codec = { workspace = true, features = ["derive"] }
 scale-info = { workspace = true, features = ["derive"] }
-# others
-# base64ct = { version = "1.5.3", features = ["alloc"] }
-base64 = { version = "0.22.1", default-features = false, features = ["alloc"] }
 
 # zk primitives
 ark-bn254 = { version = "0.4.0", default-features = false, features = ["curve"] }
@@ -57,9 +54,6 @@ std = [
     # encode/decode
     "scale-codec/std",
     "scale-info/std",
-    # others
-    # "base64ct/std",
-    "base64/std",
     # zk primitives
     "ark-crypto-primitives/std",
     "ark-groth16/std",

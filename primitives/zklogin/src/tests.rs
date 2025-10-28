@@ -17,13 +17,14 @@ use crate::{
             },
         },
     },
-    traits::{ReplaceSender, TryIntoEphPubKey},
+    traits::TryIntoEphPubKey,
     JwkProvider, ZkMaterial, ZkMaterialV1,
 };
 use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use num_bigint::BigUint;
 use rand;
+use sp_core::H256;
 
 // ================================ Test cases for affine points on the curve ================================
 #[test]
@@ -156,27 +157,7 @@ fn test_to_poseidon_hash() {
 
 // ================================ Test cases for traits part ================================
 use sp_core::crypto::AccountId32;
-use sp_runtime::{generic::CheckedExtrinsic, MultiAddress};
-
-#[test]
-fn test_replace_sender() {
-    // Create a test extrinsic with signature
-    let old_sender = AccountId32::new([1; 32]);
-    let new_sender = AccountId32::new([2; 32]);
-    let call = ();
-    let extra = ();
-    let mut extrinsic = CheckedExtrinsic { signed: Some((old_sender, extra)), function: call };
-
-    // Test replace_sender
-    extrinsic.replace_sender(new_sender.clone());
-    assert_eq!(extrinsic.signed.as_ref().unwrap().0, new_sender);
-
-    // Test with unsigned extrinsic
-    let mut unsigned_extrinsic: CheckedExtrinsic<AccountId32, (), ()> =
-        CheckedExtrinsic { signed: None, function: () };
-    unsigned_extrinsic.replace_sender(new_sender);
-    assert!(unsigned_extrinsic.signed.is_none());
-}
+use sp_runtime::MultiAddress;
 
 #[test]
 fn test_try_into_eph_pubkey() {
@@ -336,7 +317,7 @@ fn zk_login_should_fail_when_address_seed_not_match() {
     let jwk = jwks[0].clone();
 
     let random_seed = [u8::try_from(rand::random::<u8>()).unwrap_or(0); 32];
-    let invalid_address_seed = AccountId32::from(random_seed);
+    let invalid_address_seed = H256::from(random_seed);
 
     let zk_material: ZkMaterial<u64> =
         ZkMaterialV1::new(JwkProvider::Google, kid, input, max_epoch).into();

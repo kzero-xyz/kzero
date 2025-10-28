@@ -11,8 +11,6 @@ use crate::{
 use ark_bn254::Bn254;
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::{Groth16, Proof};
-// use base64ct::{Base64UrlUnpadded, Encoding};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 
 use scale_codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
@@ -21,11 +19,6 @@ use sp_std::vec::Vec;
 
 pub use error::{ZkAuthError, ZkAuthResult};
 pub use zk_input::{Claim, ZkLoginInputs, ZkLoginProof};
-
-// pub use jsonwebtoken::{
-//     errors::ErrorKind,
-//     jwk::{AlgorithmParameters, Jwk},
-// };
 
 pub use jose_jwa::{Algorithm, Signing};
 pub use jose_jwk::{Jwk, Key, Parameters};
@@ -286,15 +279,11 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterialV1<Moment> {
         address_seed: &H256,
         jwk: &Jwk,
     ) -> ZkAuthResult<()> {
-        // let modulus = if let AlgorithmParameters::RSA(ref key_params) = jwk.algorithm {
-        //     // Decode modulus to bytes.
-        //     // Base64UrlUnpadded::decode_vec(&key_params.n)
-        //     //     .map_err(|_| ZkAuthError::ModulusDecodeError)?
-        // } else {
-        //     return Err(ZkAuthError::UnsupportedAlgorithm);
-        // };
+        // Extract modulus from RSA key
+        // Note: The Bytes type in jose-jwk already contains decoded bytes, not base64 string
         let modulus = if let Key::Rsa(ref rsa) = jwk.key {
-            URL_SAFE_NO_PAD.decode(&rsa.n).map_err(|_| ZkAuthError::ModulusDecodeError)?
+            // rsa.n is already decoded bytes (Bytes implements Deref to Box<[u8]>)
+            rsa.n.as_ref()
         } else {
             return Err(ZkAuthError::UnsupportedAlgorithm);
         };
@@ -307,7 +296,7 @@ impl<Moment: Copy + TryInto<u64>> ZkMaterialV1<Moment> {
             &[self.inputs.calculate_all_inputs_hash(
                 address_seed_u256,
                 &eph_pubkey,
-                &modulus,
+                modulus,
                 self.ephkey_expire_at.try_into().map_err(|_| ZkAuthError::ExpireAtFormatError)?,
             )?],
         ) {
