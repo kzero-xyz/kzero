@@ -9,7 +9,7 @@ use ark_ff::Zero;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use sp_core::{crypto::AccountId32, ed25519::Pair as Ed25519Pair, Pair, U256};
+use sp_core::{ed25519::Pair as Ed25519Pair, Pair, H256, U256};
 use std::str::FromStr;
 
 const MAX_KEY_CLAIM_NAME_LENGTH: u8 = 32;
@@ -196,7 +196,7 @@ pub fn get_test_eph_key() -> Ed25519Pair {
     Pair::from_seed(&pri_key)
 }
 
-pub fn get_raw_data() -> (AccountId32, String, u64, [u8; 32]) {
+pub fn get_raw_data() -> (H256, String, u64, [u8; 32]) {
     let user_salt = "6903439401297002981078976741241818963710729444388942281949823152082404716376301797176193848";
 
     let address_seed = gen_address_seed(
@@ -210,7 +210,7 @@ pub fn get_raw_data() -> (AccountId32, String, u64, [u8; 32]) {
     let address_u256 = U256::from_dec_str(&address_seed).expect("");
     // TODO not sure for this.
     let s: [u8; 32] = address_u256.to_little_endian();
-    let address_seed = AccountId32::from(s);
+    let address_seed = s.into();
 
     let proof_data = r#"{
         "proof_points": {
@@ -310,9 +310,7 @@ pub mod test_cases {
         pub fn kids(is_valid: bool) -> Vec<Kid> {
             jwks(is_valid)
                 .into_iter()
-                .map(|jwk| {
-                    jwk.prm.kid.expect("Test case JWK must has kid").as_bytes().to_vec()
-                })
+                .map(|jwk| jwk.prm.kid.expect("Test case JWK must has kid").as_bytes().to_vec())
                 .collect()
         }
     }

@@ -18,4 +18,5 @@ sp-core = { workspace = true, features = ["default"] }
 sp-runtime = { workspace = true, features = ["default"] }
 # local
 node-template = { workspace = true }
+pallet-zklogin = { workspace = true, features = ["default"] }
 primitive-zklogin = { workspace = true, features = ["default", "testing"] }

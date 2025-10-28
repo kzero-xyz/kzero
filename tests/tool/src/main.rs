@@ -1,28 +1,22 @@
 use scale_codec::Encode;
-use sp_core::{Pair, H256};
+use sp_core::Pair;
 use sp_runtime::generic::Era;
 // local
 use node_template::node_template_runtime::{
-    self, AccountId, Address, BalancesCall, InnerSignedExtra, InnerSignedPayload,
-    InnerUncheckedExtrinsic, Runtime, RuntimeCall, Signature, SignedExtra, UncheckedExtrinsic,
-    ZkLoginCall,
+    AccountId, Address, BalancesCall, Runtime, RuntimeCall, Signature, SignedPayload, TxExtension,
+    UncheckedExtrinsic, ZkLoginCall,
 };
 use primitive_zklogin::{
     test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs, test_cases::google},
     JwkProvider, ZkMaterialV1,
 };
-use sp_runtime::traits::ValidateUnsigned;
-
-// must replace this genesis to your own
-const CHAIN_GENESIS: [u8; 32] =
-    hex_literal::hex!("ab0330f2324982e2afb7bd23becbd23450262eeb7ac233aca981f281bed056e5");
 
 fn main() {
     // transfer to 0x197cf48b729ff12596cbc046c7fe8f88f92ac5f0b6fc42b4c1dcc532d37ccea2 first
 
     // get zk-related variables for zk-proof verifying
     let (address_seed, input_data, expire_at, _) = get_raw_data();
-    let inputs = get_zklogin_inputs(input_data);
+    let inputs: primitive_zklogin::ZkLoginInputs = get_zklogin_inputs(input_data);
 
     // A test key, may can replace to any one, but must ed25519 key pair.
     let signing_key = get_test_eph_key();
@@ -44,51 +38,29 @@ fn main() {
     let call: RuntimeCall =
         BalancesCall::transfer_keep_alive { dest: Address::Id(dest.clone()), value: 600 }.into();
 
-    let genesis_block: H256 = CHAIN_GENESIS.into();
-    // we should use the `InnerSignedExtra` to construct the inner unsigned extrinsic(which does not include `CheckWeight`)
-    let inner_extra: InnerSignedExtra = (
+    let call: RuntimeCall =
+        ZkLoginCall::submit_zklogin { zk_material, address_seed, call: Box::new(call) }.into();
+
+    let tx_ext: TxExtension = (
         frame_system::CheckNonZeroSender::<Runtime>::new(),
         frame_system::CheckSpecVersion::<Runtime>::new(),
         frame_system::CheckTxVersion::<Runtime>::new(),
         frame_system::CheckGenesis::<Runtime>::new(),
         frame_system::CheckEra::<Runtime>::from(Era::Immortal),
+        pallet_zklogin::ZkLoginExtension::<Runtime>::new(),
         frame_system::CheckNonce::<Runtime>::from(0),
+        frame_system::CheckWeight::<Runtime>::new(),
         pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(0),
     );
-    let payload = InnerSignedPayload::from_raw(
-        call.clone(),
-        inner_extra.clone(),
-        (
-            (),
-            node_template_runtime::VERSION.spec_version,
-            node_template_runtime::VERSION.transaction_version,
-            genesis_block,
-            // notice this field should provide for `Era`, but we use genesis to replace it.
-            genesis_block,
-            (),
-            (),
-        ),
-    );
-    let sign = payload.using_encoded(|d| signing_key.sign(d));
-    // construct inner unchecked_extrinsic
-    let uxt = InnerUncheckedExtrinsic::new_signed(
+    let raw_payload = SignedPayload::new(call, tx_ext).ok().expect("should build successfully");
+    let sign = raw_payload.using_encoded(|d| signing_key.sign(d));
+    let (call, tx_ext, _) = raw_payload.deconstruct();
+    // construct unchecked_extrinsic
+    let uxt = UncheckedExtrinsic::new_signed(
         call,
         AccountId::from(signing_key.public()).into(),
         Signature::from(sign),
-        inner_extra,
+        tx_ext,
     );
-
-    println!("inner tx\n0x{}", hex::encode(uxt.encode()));
-
-    // construct outer extrinsic
-    let final_call: RuntimeCall = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt),
-        address_seed: address_seed.into(),
-        zk_material,
-    }
-    .into();
-
-    let outer_utx = UncheckedExtrinsic::new_unsigned(final_call);
-
-    println!("outer tx\n0x{}", hex::encode(outer_utx.encode()))
+    println!("outer tx\n0x{}", hex::encode(uxt.encode()))
 }

@@ -5833,6 +5833,7 @@ dependencies = [
  "sc-offchain",
  "sc-rpc-api",
  "sc-service",
+ "sc-statement-store",
  "sc-telemetry",
  "sc-transaction-pool",
  "sc-transaction-pool-api",
@@ -8907,6 +8908,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-statement-store"
+version = "21.0.0"
+source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2503#6d637bc3ec5f9c8ac44c220087cf78f4b39709b8"
+dependencies = [
+ "log",
+ "parity-db",
+ "parking_lot 0.12.3",
+ "sc-client-api",
+ "sc-keystore",
+ "sp-api",
+ "sp-blockchain",
+ "sp-core",
+ "sp-runtime",
+ "sp-statement-store",
+ "substrate-prometheus-endpoint",
+ "tokio",
+]
+
+[[package]]
 name = "sc-sysinfo"
 version = "42.0.0"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2503#6d637bc3ec5f9c8ac44c220087cf78f4b39709b8"
@@ -11293,6 +11313,7 @@ dependencies = [
  "hex-literal",
  "node-template",
  "pallet-transaction-payment",
+ "pallet-zklogin",
  "parity-scale-codec",
  "primitive-zklogin",
  "sp-core",
