@@ -115,8 +115,6 @@ pub mod pallet {
 
     #[pallet::error]
     pub enum Error<T> {
-        /// Ephemeral key is is expired.
-        EphKeyExpired,
         /// Jwk JSON is too large to fit in BoundedVec.
         JwkJsonTooLarge,
         /// Parse json to Jwk struct error.
@@ -155,25 +153,70 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
-        // TODO: provide a valid weight
+        /// Submit and execute a call using zkLogin authentication.
+        ///
+        /// This extrinsic allows users to execute transactions using zkLogin authentication,
+        /// where the actual caller is derived from a zero-knowledge proof rather than a
+        /// traditional keypair signature.
+        ///
+        /// # Parameters
+        ///
+        /// * `origin` - The origin has been transformed by `ZkLoginExtension` from an ephemeral
+        ///   key signature to the zkLogin account (derived from `address_seed`). The extension
+        ///   verifies the zero-knowledge proof and replaces the ephemeral signer with the
+        ///   zkLogin account before this call is executed.
+        ///
+        /// * `call` - The actual call to be executed on behalf of the zkLogin account.
+        ///
+        /// * `_address_seed` - Used by `ZkLoginExtension` to derive the zkLogin account address.
+        ///   This parameter is prefixed with `_` because it's consumed by the extension during
+        ///   validation and is not directly used in this function body.
+        ///
+        /// * `_zk_material` - Contains the zero-knowledge proof and metadata required for
+        ///   verification. This is validated by `ZkLoginExtension` before reaching this function,
+        ///   including:
+        ///   - The ZK proof itself
+        ///   - JWK provider and key ID
+        ///   - Ephemeral key expiration time
+        ///
+        /// # Flow
+        ///
+        /// 1. User signs transaction with an ephemeral key
+        /// 2. `ZkLoginExtension` validates the ZK proof using `address_seed` and `zk_material`
+        /// 3. Extension transforms the origin from ephemeral signer to zkLogin account
+        /// 4. This function executes with the transformed origin
+        /// 5. The `call` is dispatched on behalf of the zkLogin account
+        ///
+        /// # Note
+        ///
+        /// - Nested `submit_zklogin` calls are explicitly prevented to avoid security issues.
+        ///
+        /// # Warning
+        ///
+        /// **Regular users should NOT call this function directly!** This function can technically
+        /// be called by regular accounts (without zkLogin), but doing so is strongly discouraged as:
+        /// - It provides no benefits whatsoever
+        /// - It wastes additional weight compared to calling the inner `call` directly
+        /// - It adds unnecessary overhead to your transaction
+        ///
+        /// The zkLogin flow is only meaningful when used with `ZkLoginExtension` for origin
+        /// transformation. Use this function only if you're using zkLogin authentication.
         #[pallet::call_index(0)]
         #[pallet::weight({
-            // uxt.get_dispatch_info().weight
-            0
+            let dispatch_info = call.get_dispatch_info();
+            // TODO: provide a valid weight
+            // T::WeightInfo::submit_zklogin().saturating_add(dispatch_info.call_weight)
+            (dispatch_info.call_weight, dispatch_info.class)
         })]
         pub fn submit_zklogin(
             origin: OriginFor<T>,
             call: Box<<T as Config>::RuntimeCall>,
             _address_seed: H256,
-            zk_material: ZkMaterial<MomentOf<T>>,
+            _zk_material: ZkMaterial<MomentOf<T>>,
         ) -> DispatchResultWithPostInfo {
-            // make sure this call is unsigned signed
+            // Ensure the call is signed. At this point, the origin has already been transformed
+            // by ZkLoginExtension from the ephemeral key signer to the zkLogin account.
             let zk_account = ensure_signed(origin.clone())?;
-
-            // check ephemeral key's expiration time, TODO move to `validate`?
-            let now = T::Time::now();
-            let expire_at: MomentOf<T> = zk_material.get_ephkey_expire_at();
-            ensure!(expire_at >= now, Error::<T>::EphKeyExpired);
 
             // execute real call
             let mut filtered_origin = origin.clone();
@@ -368,6 +411,61 @@ pub enum Val {
     Refund(Weight),
 }
 
+/// Transaction extension that validates zkLogin proofs and transforms the origin.
+///
+/// This extension is a critical component of the zkLogin authentication system. It intercepts
+/// transactions that use `submit_zklogin` and performs zero-knowledge proof validation before
+/// transforming the transaction origin from an ephemeral key signer to the zkLogin account.
+///
+/// # Key Functionality
+///
+/// When a transaction is submitted:
+/// 1. The transaction is initially signed with an ephemeral key
+/// 2. This extension validates the zero-knowledge proof in the transaction
+/// 3. If validation succeeds, it **transforms the origin** from the ephemeral signer to the
+///    zkLogin account (derived from `address_seed`)
+/// 4. Subsequent transaction extensions and the final dispatch receive the transformed origin
+///
+/// # Critical Configuration Requirement
+///
+/// **IMPORTANT**: In your runtime's `TxExtension` tuple, `ZkLoginExtension` MUST be placed
+/// **BEFORE** any other extensions that depend on or check the transaction origin (such as
+/// `CheckNonce`, `ChargeTransactionPayment`, etc.).
+///
+/// This is because `ZkLoginExtension` modifies the origin, and downstream extensions need to
+/// see the transformed zkLogin account, not the ephemeral key signer.
+///
+/// ## Correct Configuration Example
+///
+/// ```rust,ignore
+/// pub type TxExtension = (
+///     frame_system::CheckNonZeroSender<Runtime>,
+///     frame_system::CheckSpecVersion<Runtime>,
+///     frame_system::CheckTxVersion<Runtime>,
+///     frame_system::CheckGenesis<Runtime>,
+///     frame_system::CheckEra<Runtime>,
+///     pallet_zklogin::ZkLoginExtension<Runtime>,  // ← Must come before CheckNonce
+///     frame_system::CheckNonce<Runtime>,          // ← Needs transformed origin
+///     frame_system::CheckWeight<Runtime>,
+///     pallet_transaction_payment::ChargeTransactionPayment<Runtime>,  // ← Needs transformed origin
+/// );
+/// ```
+///
+/// ## Incorrect Configuration (DO NOT USE)
+///
+/// ```rust,ignore
+/// pub type TxExtension = (
+///     // ... other extensions ...
+///     frame_system::CheckNonce<Runtime>,          // ✗ Will use ephemeral key origin
+///     pallet_zklogin::ZkLoginExtension<Runtime>,  // ✗ Too late - origin already checked
+///     // ... other extensions ...
+/// );
+/// ```
+///
+/// # For Non-zkLogin Transactions
+///
+/// For transactions that don't use `submit_zklogin`, this extension simply passes through
+/// without modification, adding minimal overhead.
 #[derive(Encode, Decode, DecodeWithMemTracking, Clone, Eq, PartialEq, TypeInfo, Debug)]
 #[scale_info(skip_type_params(T))]
 pub struct ZkLoginExtension<T: Config + Send + Sync> {
