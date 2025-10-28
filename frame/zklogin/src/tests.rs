@@ -27,14 +27,18 @@ pub type Signature = MultiSignature;
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 pub type Address = MultiAddress<AccountId, ()>;
 
-type MockUncheckedExtrinsic = UncheckedExtrinsic<Address, RuntimeCall, MultiSignature, SignedExtra>;
+type TxExtension = (
+    super::ZkLoginExtension<Test>,
+    frame_system::CheckNonce<Test>,
+    frame_system::CheckWeight<Test>,
+    pallet_transaction_payment::ChargeTransactionPayment<Test>,
+);
 
-pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
+type MockUncheckedExtrinsic = UncheckedExtrinsic<Address, RuntimeCall, MultiSignature, TxExtension>;
+
+pub type SignedPayload = generic::SignedPayload<RuntimeCall, TxExtension>;
 
 type Block = generic::Block<Header, MockUncheckedExtrinsic>;
-
-type SignedExtra =
-    (frame_system::CheckWeight<Test>, pallet_transaction_payment::ChargeTransactionPayment<Test>);
 
 type MockExecutive = frame_executive::Executive<
     Test,
@@ -165,14 +169,16 @@ impl frame_system::offchain::CreateSignedTransaction<super::Call<Test>> for Test
             BlockHashCount::get().checked_next_power_of_two().map(|c| c / 2).unwrap_or(2) as u64;
         let current_block = System::block_number().saturated_into::<u64>().saturating_sub(1);
         let era = sp_runtime::generic::Era::mortal(period, current_block);
-        let extra = (
+        let tx_ext = (
+            super::ZkLoginExtension::<Test>::new(),
+            frame_system::CheckNonce::<Test>::from(nonce),
             frame_system::CheckWeight::<Test>::new(),
             pallet_transaction_payment::ChargeTransactionPayment::<Test>::from(tip),
         );
-        let raw_payload = SignedPayload::new(call.clone(), extra.clone()).ok()?;
+        let raw_payload = SignedPayload::new(call.clone(), tx_ext.clone()).ok()?;
         let signature = raw_payload.using_encoded(|payload| C::sign(payload, public))?;
         let address = <Test as frame_system::Config>::Lookup::unlookup(account);
-        Some(MockUncheckedExtrinsic::new_signed(call, address, signature, extra))
+        Some(MockUncheckedExtrinsic::new_signed(call, address, signature, tx_ext))
     }
 }
 
@@ -262,12 +268,12 @@ fn validate_unsigned_should_work() {
         zk_material,
     };
 
-    // construct outer UncheckedExtrinsic using `SignedExtra``
+    // construct outer UncheckedExtrinsic using `TxExtension``
     let outer_uxt = UncheckedExtrinsic::<
         MultiAddress<AccountId, ()>,
         RuntimeCall,
         MultiSignature,
-        SignedExtra,
+        TxExtension,
     >::new_unsigned(final_call.clone().into());
 
     // calculate the call_weight & call_weight_to_fee
@@ -759,12 +765,14 @@ fn test_submit_zklogin() {
 
     // Create signed payload
     let signing_key: ed25519::Pair = get_test_eph_key();
-    let inner_extra: SignedExtra = (
+    let tx_ext: TxExtension = (
+        super::ZkLoginExtension::<Test>::new(),
+        frame_system::CheckNonce::<Test>::from(0),
         frame_system::CheckWeight::<Test>::new(),
         pallet_transaction_payment::ChargeTransactionPayment::from(0),
     );
     let inner_payload =
-        SignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
+        SignedPayload::new(call.clone(), tx_ext.clone()).expect("payload should succeed");
     let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
 
     // Create unchecked extrinsic
@@ -772,7 +780,7 @@ fn test_submit_zklogin() {
         call.clone(),
         AccountId::from(signing_key.public()).into(),
         MultiSignature::from(inner_sign),
-        inner_extra.clone(),
+        tx_ext.clone(),
     );
     let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin {
         call: Box::new(call.clone()),
@@ -853,16 +861,18 @@ fn should_weight_the_same() {
             let _ = Balances::deposit_creating(&account_id, INIT_BALANCE);
 
             // Sign payload (directly sign call encoding, production environment may have additional signed extensions)
-            let extra = (
+            let tx_ext = (
+                super::ZkLoginExtension::<Test>::new(),
+                frame_system::CheckNonce::<Test>::from(0),
                 frame_system::CheckWeight::new(),
                 pallet_transaction_payment::ChargeTransactionPayment::from(0),
             );
             let payload =
-                SignedPayload::new(call.clone(), extra.clone()).expect("payload should succeed");
+                SignedPayload::new(call.clone(), tx_ext.clone()).expect("payload should succeed");
             let signature = payload.using_encoded(|d| pair.sign(d));
             let multi_sig = MultiSignature::from(signature);
             let remark_extrinsic =
-                MockUncheckedExtrinsic::new_signed(call.clone(), address, multi_sig, extra);
+                MockUncheckedExtrinsic::new_signed(call.clone(), address, multi_sig, tx_ext);
 
             // Record BlockWeight before execution
             let block_weight_before = frame_system::BlockWeight::<Test>::get();
@@ -914,32 +924,34 @@ fn should_weight_the_same() {
                 jwks.as_bytes().to_vec()
             ));
             let signing_key: ed25519::Pair = get_test_eph_key();
-            // construct UnsignedExtrinsic using `SignedExtra`
-            let inner_extra: SignedExtra = (
+            // construct UnsignedExtrinsic using `TxExtension`
+            let tx_ext: TxExtension = (
+                super::ZkLoginExtension::<Test>::new(),
+                frame_system::CheckNonce::<Test>::from(0),
                 frame_system::CheckWeight::<Test>::new(),
                 pallet_transaction_payment::ChargeTransactionPayment::from(0),
             );
             let inner_payload =
-                SignedPayload::new(sys_remark_call.clone(), inner_extra.clone())
+                SignedPayload::new(sys_remark_call.clone(), tx_ext.clone())
                     .expect("payload should succeed");
             let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
             let uxt = MockUncheckedExtrinsic::new_signed(
                 sys_remark_call.clone(),
                 AccountId::from(signing_key.public()).into(),
                 MultiSignature::from(inner_sign),
-                inner_extra.clone(),
+                tx_ext.clone(),
             );
             let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin {
                 call: Box::new(sys_remark_call.clone()),
                 address_seed: address_seed.clone().into(),
                 zk_material,
             };
-            // construct outer UncheckedExtrinsic using `SignedExtra``
+            // construct outer UncheckedExtrinsic using `TxExtension``
             let outer_uxt = UncheckedExtrinsic::<
                 MultiAddress<AccountId, ()>,
                 RuntimeCall,
                 MultiSignature,
-                SignedExtra,
+                TxExtension,
             >::new_unsigned(final_call.clone().into());
             assert_ok!(ZkLogin::set_jwk(
                 RawOrigin::Root.into(),
@@ -1017,12 +1029,12 @@ fn validate_add_proxy_should_work() {
         zk_material,
     };
 
-    // construct outer UncheckedExtrinsic using `SignedExtra``
+    // construct outer UncheckedExtrinsic using `TxExtension``
     let outer_uxt = UncheckedExtrinsic::<
         MultiAddress<AccountId, ()>,
         RuntimeCall,
         MultiSignature,
-        SignedExtra,
+        TxExtension,
     >::new_unsigned(final_call.clone().into());
 
     new_test_ext().execute_with(|| {
@@ -1080,12 +1092,12 @@ fn validate_proxy_call_should_work() {
         zk_material,
     };
 
-    // construct outer UncheckedExtrinsic using `SignedExtra``
+    // construct outer UncheckedExtrinsic using `TxExtension``
     let outer_uxt = UncheckedExtrinsic::<
         MultiAddress<AccountId, ()>,
         RuntimeCall,
         MultiSignature,
-        SignedExtra,
+        TxExtension,
     >::new_unsigned(final_call.clone().into());
 
     new_test_ext().execute_with(|| {
@@ -1123,12 +1135,14 @@ fn validate_proxy_call_should_work() {
             force_proxy_type: None,
             call: Box::new(transfer_call),
         };
-        // construct the outer UncheckedExtrinsic using `SignedExtra``
-        let extra = (
+        // construct the outer UncheckedExtrinsic using `TxExtension``
+        let tx_ext = (
+            super::ZkLoginExtension::<Test>::new(),
+            frame_system::CheckNonce::<Test>::from(0),
             frame_system::CheckWeight::new(),
             pallet_transaction_payment::ChargeTransactionPayment::from(0),
         );
-        let payload = SignedPayload::new(proxy_call.clone().into(), extra.clone())
+        let payload = SignedPayload::new(proxy_call.clone().into(), tx_ext.clone())
             .expect("payload should succeed");
         let sign = payload.using_encoded(|d| delegatee_pair.sign(d));
 
@@ -1136,7 +1150,7 @@ fn validate_proxy_call_should_work() {
             proxy_call.clone().into(),
             delegatee.clone().into(),
             MultiSignature::from(sign),
-            extra.clone(),
+            tx_ext.clone(),
         );
 
         // calculate the `call_weight` & `call_weight_to_fee`
@@ -1210,12 +1224,12 @@ fn validate_remove_proxy_should_work() {
         zk_material: zk_material.clone(),
     };
 
-    // construct outer UncheckedExtrinsic using `SignedExtra``
+    // construct outer UncheckedExtrinsic using `TxExtension``
     let outer_uxt = UncheckedExtrinsic::<
         MultiAddress<AccountId, ()>,
         RuntimeCall,
         MultiSignature,
-        SignedExtra,
+        TxExtension,
     >::new_unsigned(final_call.clone().into());
 
     new_test_ext().execute_with(|| {
@@ -1250,12 +1264,12 @@ fn validate_remove_proxy_should_work() {
             zk_material,
         };
 
-        // construct outer UncheckedExtrinsic using `SignedExtra``
+        // construct outer UncheckedExtrinsic using `TxExtension``
         let outer_uxt = UncheckedExtrinsic::<
             MultiAddress<AccountId, ()>,
             RuntimeCall,
             MultiSignature,
-            SignedExtra,
+            TxExtension,
         >::new_unsigned(final_call.clone().into());
         assert_ok!(final_call.dispatch_bypass_filter(RawOrigin::None.into()));
         assert_ok!(MockExecutive::apply_extrinsic(outer_uxt));
@@ -1301,12 +1315,12 @@ fn validate_create_recovery_should_work() {
         zk_material,
     };
 
-    // construct outer UncheckedExtrinsic using `SignedExtra``
+    // construct outer UncheckedExtrinsic using `TxExtension``
     let outer_uxt = UncheckedExtrinsic::<
         MultiAddress<AccountId, ()>,
         RuntimeCall,
         MultiSignature,
-        SignedExtra,
+        TxExtension,
     >::new_unsigned(final_call.clone().into());
 
     new_test_ext().execute_with(|| {
