@@ -1,5 +1,4 @@
 use crate::{Call as ZkLoginCall, Pallet};
-use frame_executive::Executive;
 use frame_support::{
     assert_ok, derive_impl,
     dispatch::{GetDispatchInfo, RawOrigin},
@@ -10,46 +9,40 @@ use frame_support::{
 use pallet_balances::Call as BalancesCall;
 use primitive_zklogin::{
     test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs, test_cases::google},
-    JwkProvider, ZkMaterialV1,
+    JwkProvider, Signing, ZkMaterialV1,
 };
 use scale_codec::Encode;
 use sp_core::{ed25519, Pair};
 use sp_runtime::{
     generic,
-    generic::{CheckedExtrinsic, UncheckedExtrinsic},
-    traits::{BlakeTwo256, IdentifyAccount, Verify},
+    generic::UncheckedExtrinsic,
+    traits::{BlakeTwo256, IdentifyAccount, SaturatedConversion, Verify},
     BuildStorage, MultiAddress, MultiSignature,
 };
 
 /// An index to a block.
 pub type BlockNumber = u32;
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
-type Context = frame_system::ChainContext<Test>;
 pub type Signature = MultiSignature;
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 pub type Address = MultiAddress<AccountId, ()>;
-// for inner transaction, we use the innerMockUncheckedExtrinsic & innerMockCheckedExtrinsic(which use the innerSignedPayload)
-type InnerMockUncheckedExtrinsic =
-    UncheckedExtrinsic<Address, RuntimeCall, MultiSignature, InnerSignedExtra>;
-type InnerMockCheckedExtrinsic = CheckedExtrinsic<AccountId, RuntimeCall, InnerSignedExtra>;
-// for inner transaction, we use the innerSignedPayload(which use the innerSignedExtra)
-pub type InnerSignedPayload = generic::SignedPayload<RuntimeCall, InnerSignedExtra>;
 
 type MockUncheckedExtrinsic = UncheckedExtrinsic<Address, RuntimeCall, MultiSignature, SignedExtra>;
-// type MockCheckedExtrinsic = CheckedExtrinsic<AccountId, RuntimeCall, SignedExtra>;
 
 pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
 
 type Block = generic::Block<Header, MockUncheckedExtrinsic>;
 
-// for the outer extrinsic we apply the checkWeight
 type SignedExtra =
     (frame_system::CheckWeight<Test>, pallet_transaction_payment::ChargeTransactionPayment<Test>);
-// but for the inner transaction, we avoid the checkWeight, only do the charge
-// when create the innerSignedPayload, we use the innerSignedExtra(which use the chargeTransactionPayment only)
-type InnerSignedExtra = (pallet_transaction_payment::ChargeTransactionPayment<Test>,);
 
-type MockExecutive = Executive<Test, Block, Context, Test, AllPalletsWithSystem, ()>;
+type MockExecutive = frame_executive::Executive<
+    Test,
+    Block,
+    frame_system::ChainContext<Test>,
+    Test,
+    AllPalletsWithSystem,
+>;
 
 frame_support::construct_runtime!(
     pub enum Test
@@ -85,6 +78,7 @@ impl pallet_proxy::Config for Test {
     type CallHasher = sp_runtime::traits::BlakeTwo256;
     type AnnouncementDepositBase = ();
     type AnnouncementDepositFactor = ();
+    type BlockNumberProvider = frame_system::Pallet<Test>;
 }
 
 impl pallet_recovery::Config for Test {
@@ -96,6 +90,7 @@ impl pallet_recovery::Config for Test {
     type FriendDepositFactor = FriendDepositFactor;
     type MaxFriends = MaxFriends;
     type RecoveryDeposit = RecoveryDeposit;
+    type BlockNumberProvider = frame_system::Pallet<Test>;
 }
 parameter_types! {
     pub const BlockHashCount: u32 = 250;
@@ -118,14 +113,6 @@ impl frame_system::offchain::SigningTypes for Test {
 #[derive_impl(pallet_timestamp::config_preludes::TestDefaultConfig)]
 impl pallet_timestamp::Config for Test {}
 
-impl<LocalCall> frame_system::offchain::SendTransactionTypes<LocalCall> for Test
-where
-    RuntimeCall: From<LocalCall>,
-{
-    type OverarchingCall = RuntimeCall;
-    type Extrinsic = MockUncheckedExtrinsic;
-}
-
 #[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
 impl pallet_balances::Config for Test {
     type AccountStore = System;
@@ -145,13 +132,55 @@ impl pallet_transaction_payment::Config for Test {
     type FeeMultiplierUpdate = ();
 }
 
+parameter_types! {
+    pub const JwkJsonLimit: u32 = 2048;
+}
+
+impl<LocalCall> frame_system::offchain::CreateTransactionBase<LocalCall> for Test
+where
+    RuntimeCall: From<LocalCall>,
+{
+    type Extrinsic = MockUncheckedExtrinsic;
+    type RuntimeCall = RuntimeCall;
+}
+
+impl frame_system::offchain::CreateInherent<super::Call<Test>> for Test {
+    fn create_inherent(call: RuntimeCall) -> Self::Extrinsic {
+        MockUncheckedExtrinsic::new_bare(call)
+    }
+}
+
+impl frame_system::offchain::CreateSignedTransaction<super::Call<Test>> for Test {
+    fn create_signed_transaction<
+        C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>,
+    >(
+        call: RuntimeCall,
+        public: <Signature as Verify>::Signer,
+        account: <Test as frame_system::Config>::AccountId,
+        nonce: <Test as frame_system::Config>::Nonce,
+    ) -> Option<MockUncheckedExtrinsic> {
+        use sp_runtime::traits::StaticLookup;
+        let tip = 0;
+        let period =
+            BlockHashCount::get().checked_next_power_of_two().map(|c| c / 2).unwrap_or(2) as u64;
+        let current_block = System::block_number().saturated_into::<u64>().saturating_sub(1);
+        let era = sp_runtime::generic::Era::mortal(period, current_block);
+        let extra = (
+            frame_system::CheckWeight::<Test>::new(),
+            pallet_transaction_payment::ChargeTransactionPayment::<Test>::from(tip),
+        );
+        let raw_payload = SignedPayload::new(call.clone(), extra.clone()).ok()?;
+        let signature = raw_payload.using_encoded(|payload| C::sign(payload, public))?;
+        let address = <Test as frame_system::Config>::Lookup::unlookup(account);
+        Some(MockUncheckedExtrinsic::new_signed(call, address, signature, extra))
+    }
+}
+
 impl super::Config for Test {
     type AuthorityId = crate::crypto::ZkLoginAuthId;
     type RuntimeEvent = RuntimeEvent;
-    type Context = Context;
-    type Extrinsic = InnerMockUncheckedExtrinsic;
-    type CheckedExtrinsic = InnerMockCheckedExtrinsic;
-    type UnsignedValidator = Test;
+    type RuntimeCall = RuntimeCall;
+    type JwkJsonLimit = JwkJsonLimit;
     type Time = Timestamp;
     type MaxKeys = MaxKeys;
     type WeightInfo = ();
@@ -174,7 +203,7 @@ impl crate::weights::WeightInfo for () {
 
 fn zk_address() -> AccountId {
     let (zklogin_address, ..) = get_raw_data();
-    zklogin_address
+    AccountId::from(zklogin_address.0)
 }
 
 const INIT_BALANCE: u64 = 1_000_000_000_000_000;
@@ -187,6 +216,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     pallet_balances::GenesisConfig::<Test> {
         // give `zk_address` an initial value of INIT_BALANCE
         balances: vec![(zk_address(), INIT_BALANCE)],
+        ..Default::default()
     }
     .assimilate_storage(&mut t)
     .unwrap();
@@ -225,23 +255,9 @@ fn validate_unsigned_should_work() {
         BalancesCall::transfer_keep_alive { dest: MultiAddress::Id(dest.clone()), value: 100 }
             .into();
 
-    // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-    let inner_extra: InnerSignedExtra =
-        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload =
-        InnerSignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
-    let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
-
-    // construct inner unchecked_extrinsic
-    let uxt = InnerMockUncheckedExtrinsic::new_signed(
-        call.clone(),
-        AccountId::from(signing_key.public()).into(),
-        MultiSignature::from(inner_sign),
-        inner_extra,
-    );
-
-    let final_call = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt.clone()),
+    // construct submit_zklogin call with inner call
+    let final_call = ZkLoginCall::submit_zklogin {
+        call: Box::new(call.clone()),
         address_seed: address_seed.into(),
         zk_material,
     };
@@ -255,7 +271,7 @@ fn validate_unsigned_should_work() {
     >::new_unsigned(final_call.clone().into());
 
     // calculate the call_weight & call_weight_to_fee
-    let call_weight = call.clone().get_dispatch_info().weight;
+    let call_weight = call.clone().get_dispatch_info().call_weight;
     let call_weight_to_fee =
         <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
 
@@ -268,7 +284,7 @@ fn validate_unsigned_should_work() {
         <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
 
     // calculate the proof_size & proof_size_to_fee
-    let proof_size = uxt.encode().len() as u64;
+    let proof_size = outer_uxt.encode().len() as u64;
     let proof_size_to_fee =
         <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(
             &frame_support::weights::Weight::from_parts(proof_size, 0),
@@ -339,20 +355,9 @@ fn validate_unsigned_should_fail_when_jwk_not_match() {
         BalancesCall::transfer_keep_alive { dest: MultiAddress::Id(dest.clone()), value: 100 }
             .into();
 
-    let inner_extra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload =
-        InnerSignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
-    let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
-
-    // construct inner unchecked_extrinsic
-    let uxt = InnerMockUncheckedExtrinsic::new_signed(
-        call,
-        AccountId::from(signing_key.public()).into(),
-        MultiSignature::from(inner_sign),
-        inner_extra,
-    );
-    let final_call = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt),
+    // construct submit_zklogin call with inner call
+    let final_call = ZkLoginCall::submit_zklogin {
+        call: Box::new(call),
         address_seed: address_seed.into(),
         zk_material,
     };
@@ -387,8 +392,8 @@ fn test_parse_jwk_success() {
     assert!(result.is_ok());
 
     let jwk = result.unwrap();
-    assert_eq!(jwk.common.key_id, Some("test_key".to_string()));
-    assert_eq!(jwk.common.key_algorithm, Some(jsonwebtoken::jwk::KeyAlgorithm::RS256));
+    assert_eq!(jwk.prm.kid, Some("test_key".to_string()));
+    assert_eq!(jwk.prm.alg, Some(primitive_zklogin::Algorithm::Signing(Signing::Rs256)));
 }
 
 #[test]
@@ -539,7 +544,7 @@ fn test_check_jwk_not_onchain_when_different_content() {
 
     // Test case: JWK exists on chain with different content
     let mut different_jwk = jwk.clone();
-    different_jwk.common.key_id = Some("different".to_string());
+    different_jwk.prm.kid = Some("different".to_string());
     let result = check_jwk_not_onchain(provider, &jwk, |_, _| Some(different_jwk.clone()));
     assert_eq!(result, Some(true));
 }
@@ -694,11 +699,13 @@ fn test_submit_jwks_unsigned() {
 
     new_test_ext().execute_with(|| {
         // Create payload with multiple JWKs
+        let jwk1_json = serde_json::to_vec(&jwk1).unwrap();
+        let jwk2_json = serde_json::to_vec(&jwk2).unwrap();
         let payload = JwksPayload {
             public: MultiSigner::Ed25519(key1.public()),
             jwks: vec![
-                (JwkProvider::Google, vec![jwk1.clone()]),
-                (JwkProvider::Apple, vec![jwk2.clone()]),
+                (JwkProvider::Google, vec![jwk1_json]),
+                (JwkProvider::Apple, vec![jwk2_json]),
             ],
             block_number: 1,
         };
@@ -714,8 +721,8 @@ fn test_submit_jwks_unsigned() {
         ));
 
         // Verify JWKs were stored
-        let kid1 = jwk1.common.key_id.as_ref().unwrap().as_bytes();
-        let kid2 = jwk2.common.key_id.as_ref().unwrap().as_bytes();
+        let kid1 = jwk1.prm.kid.as_ref().unwrap().as_bytes();
+        let kid2 = jwk2.prm.kid.as_ref().unwrap().as_bytes();
         assert!(crate::JwkJsons::<Test>::get(JwkProvider::Google, kid1).is_some());
         assert!(crate::JwkJsons::<Test>::get(JwkProvider::Apple, kid2).is_some());
 
@@ -727,9 +734,9 @@ fn test_submit_jwks_unsigned() {
     });
 }
 
-// ================================ submit_zklogin_unsigned test ================================
+// ================================ submit_zklogin test ================================
 #[test]
-fn test_submit_zklogin_unsigned() {
+fn test_submit_zklogin() {
     use frame_support::assert_noop;
     use primitive_zklogin::{JwkProvider, ZkMaterialV1};
     use sp_runtime::DispatchError;
@@ -752,26 +759,29 @@ fn test_submit_zklogin_unsigned() {
 
     // Create signed payload
     let signing_key: ed25519::Pair = get_test_eph_key();
-    let inner_extra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
+    let inner_extra: SignedExtra = (
+        frame_system::CheckWeight::<Test>::new(),
+        pallet_transaction_payment::ChargeTransactionPayment::from(0),
+    );
     let inner_payload =
-        InnerSignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
+        SignedPayload::new(call.clone(), inner_extra.clone()).expect("payload should succeed");
     let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
 
     // Create unchecked extrinsic
-    let uxt = InnerMockUncheckedExtrinsic::new_signed(
+    let uxt = MockUncheckedExtrinsic::new_signed(
         call.clone(),
         AccountId::from(signing_key.public()).into(),
         MultiSignature::from(inner_sign),
         inner_extra.clone(),
     );
-    let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt.clone()),
+    let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin {
+        call: Box::new(call.clone()),
         address_seed: address_seed.into(),
         zk_material,
     };
 
     // call_weight & call_weight_to_fee
-    let call_weight = call.clone().get_dispatch_info().weight;
+    let call_weight = call.clone().get_dispatch_info().call_weight;
     let call_weight_to_fee =
         <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
 
@@ -831,7 +841,7 @@ fn should_weight_the_same() {
 
             // Directly measure the weight of a single call
             let dispatch_info = call.get_dispatch_info();
-            let weight = dispatch_info.weight;
+            let weight = dispatch_info.call_weight;
 
             // Generate key pair and ensure the account has balance
             let pair: ed25519::Pair = ed25519::Pair::from_seed(&[10u8; 32]);
@@ -904,20 +914,23 @@ fn should_weight_the_same() {
                 jwks.as_bytes().to_vec()
             ));
             let signing_key: ed25519::Pair = get_test_eph_key();
-            // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-            let inner_extra = (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
+            // construct UnsignedExtrinsic using `SignedExtra`
+            let inner_extra: SignedExtra = (
+                frame_system::CheckWeight::<Test>::new(),
+                pallet_transaction_payment::ChargeTransactionPayment::from(0),
+            );
             let inner_payload =
-                InnerSignedPayload::new(sys_remark_call.clone(), inner_extra.clone())
+                SignedPayload::new(sys_remark_call.clone(), inner_extra.clone())
                     .expect("payload should succeed");
             let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
-            let uxt = InnerMockUncheckedExtrinsic::new_signed(
+            let uxt = MockUncheckedExtrinsic::new_signed(
                 sys_remark_call.clone(),
                 AccountId::from(signing_key.public()).into(),
                 MultiSignature::from(inner_sign),
                 inner_extra.clone(),
             );
-            let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin_unsigned {
-                uxt: Box::new(uxt),
+            let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin {
+                call: Box::new(sys_remark_call.clone()),
                 address_seed: address_seed.clone().into(),
                 zk_material,
             };
@@ -987,7 +1000,7 @@ fn validate_add_proxy_should_work() {
     let zk_material = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
 
     // construct Proxy Call
-    let delegator = address_seed.clone();
+    let delegator = AccountId::from(address_seed.0);
     let delegatee = AccountId::from([2u8; 32]);
     // construct Proxy Call(which set the `delegatee` as the proxy)
     let proxy_call: RuntimeCall = pallet_proxy::Call::add_proxy {
@@ -997,23 +1010,9 @@ fn validate_add_proxy_should_work() {
     }
     .into();
 
-    // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-    let inner_extra: InnerSignedExtra =
-        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-
-    let inner_payload = InnerSignedPayload::new(proxy_call.clone(), inner_extra.clone())
-        .expect("payload should succeed");
-    let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
-
-    let uxt = InnerMockUncheckedExtrinsic::new_signed(
-        proxy_call,
-        AccountId::from(signing_key.public()).into(),
-        MultiSignature::from(inner_sign),
-        inner_extra.clone(),
-    );
-
-    let final_call = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt),
+    // construct submit_zklogin call with inner proxy_call
+    let final_call = ZkLoginCall::submit_zklogin {
+        call: Box::new(proxy_call),
         address_seed: address_seed.into(),
         zk_material,
     };
@@ -1061,7 +1060,7 @@ fn validate_proxy_call_should_work() {
     let zk_material = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
 
     // construct Proxy Call
-    let delegator = address_seed.clone();
+    let delegator = AccountId::from(address_seed.0);
     let delegatee_pair: ed25519::Pair = ed25519::Pair::from_seed(&[1u8; 32]);
     let account = delegatee_pair.public();
     let delegatee: AccountId = account.into();
@@ -1074,23 +1073,9 @@ fn validate_proxy_call_should_work() {
     }
     .into();
 
-    // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-    let inner_extra: InnerSignedExtra =
-        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(proxy_call.clone(), inner_extra.clone())
-        .expect("payload should succeed");
-    let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
-
-    // construct inner unchecked_extrinsic
-    let uxt = InnerMockUncheckedExtrinsic::new_signed(
-        proxy_call,
-        AccountId::from(signing_key.public()).into(),
-        MultiSignature::from(inner_sign),
-        inner_extra.clone(),
-    );
-
-    let final_call = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt),
+    // construct submit_zklogin call with inner proxy_call
+    let final_call = ZkLoginCall::submit_zklogin {
+        call: Box::new(proxy_call),
         address_seed: address_seed.into(),
         zk_material,
     };
@@ -1155,7 +1140,7 @@ fn validate_proxy_call_should_work() {
         );
 
         // calculate the `call_weight` & `call_weight_to_fee`
-        let call_weight = proxy_call.clone().get_dispatch_info().weight;
+        let call_weight = proxy_call.clone().get_dispatch_info().call_weight;
         let call_weight_to_fee =
             <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
 
@@ -1209,7 +1194,7 @@ fn validate_remove_proxy_should_work() {
         ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
 
     // construct Proxy Call(which set the `delegatee` as the proxy)
-    let delegator = address_seed.clone();
+    let delegator = AccountId::from(address_seed.0);
     let delegatee = AccountId::from([2u8; 32]);
     let proxy_call: RuntimeCall = pallet_proxy::Call::add_proxy {
         delegate: sp_runtime::MultiAddress::Id(delegatee.clone()),
@@ -1218,22 +1203,9 @@ fn validate_remove_proxy_should_work() {
     }
     .into();
 
-    let inner_extra: InnerSignedExtra =
-        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(proxy_call.clone(), inner_extra.clone())
-        .expect("payload should succeed");
-    let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
-
-    // construct inner unchecked_extrinsic
-    let uxt = InnerMockUncheckedExtrinsic::new_signed(
-        proxy_call,
-        AccountId::from(signing_key.public()).into(),
-        MultiSignature::from(inner_sign),
-        inner_extra.clone(),
-    );
-
-    let final_call = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt),
+    // construct submit_zklogin call with inner proxy_call
+    let final_call = ZkLoginCall::submit_zklogin {
+        call: Box::new(proxy_call),
         address_seed: address_seed.clone().into(),
         zk_material: zk_material.clone(),
     };
@@ -1271,22 +1243,9 @@ fn validate_remove_proxy_should_work() {
         }
         .into();
 
-        // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-        let inner_remove_extra: InnerSignedExtra =
-            (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-        let inner_remove_payload =
-            InnerSignedPayload::new(remove_proxy_call.clone(), inner_remove_extra.clone())
-                .expect("payload should succeed");
-        let inner_remove_sign = inner_remove_payload.using_encoded(|d| signing_key.sign(d));
-
-        let uxt = InnerMockUncheckedExtrinsic::new_signed(
-            remove_proxy_call,
-            AccountId::from(signing_key.public()).into(),
-            MultiSignature::from(inner_remove_sign),
-            inner_remove_extra.clone(),
-        );
-        let final_call = ZkLoginCall::submit_zklogin_unsigned {
-            uxt: Box::new(uxt),
+        // construct submit_zklogin call with inner remove_proxy_call
+        let final_call = ZkLoginCall::submit_zklogin {
+            call: Box::new(remove_proxy_call),
             address_seed: address_seed.into(),
             zk_material,
         };
@@ -1322,7 +1281,7 @@ fn validate_create_recovery_should_work() {
     let zk_material = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
 
     // construct Recovery Call(which create the recovery config) with 3 friends and threshold 1
-    let recoverable_account = address_seed.clone();
+    let recoverable_account = AccountId::from(address_seed.0);
     let friends =
         vec![AccountId::from([1u8; 32]), AccountId::from([2u8; 32]), AccountId::from([3u8; 32])];
     let threshold = 1u16;
@@ -1335,23 +1294,9 @@ fn validate_create_recovery_should_work() {
     }
     .into();
 
-    // construct InnerUnsignedExtrinsic using `InnerSignedExtra` (which does not include `CheckWeight`)
-    let inner_extra: InnerSignedExtra =
-        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(recovery_call.clone(), inner_extra.clone())
-        .expect("payload should succeed");
-    let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
-
-    // construct inner unchecked_extrinsic
-    let uxt = InnerMockUncheckedExtrinsic::new_signed(
-        recovery_call,
-        AccountId::from(signing_key.public()).into(),
-        MultiSignature::from(inner_sign),
-        inner_extra.clone(),
-    );
-
-    let final_call = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt),
+    // construct submit_zklogin call with inner recovery_call
+    let final_call = ZkLoginCall::submit_zklogin {
+        call: Box::new(recovery_call),
         address_seed: address_seed.into(),
         zk_material,
     };
@@ -1398,7 +1343,7 @@ fn validate_complete_recovery_flow_should_work() {
         ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
 
     // Setup accounts
-    let lost_account = address_seed.clone(); // zk account
+    let lost_account = AccountId::from(address_seed.0); // zk account
     let rescuer_account = AccountId::from([5u8; 32]); // rescuer account
     let friend1 = AccountId::from([1u8; 32]); // friend1 account
     let friend2 = AccountId::from([2u8; 32]); // friend2 account
@@ -1414,27 +1359,16 @@ fn validate_complete_recovery_flow_should_work() {
         delay_period,
     }
     .into();
-    let inner_extra: InnerSignedExtra =
-        (pallet_transaction_payment::ChargeTransactionPayment::from(0),);
-    let inner_payload = InnerSignedPayload::new(create_recovery_call.clone(), inner_extra.clone())
-        .expect("payload should succeed");
-    let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
 
-    let uxt = InnerMockUncheckedExtrinsic::new_signed(
-        create_recovery_call,
-        AccountId::from(signing_key.public()).into(),
-        MultiSignature::from(inner_sign),
-        inner_extra.clone(),
-    );
-
-    let create_final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin_unsigned {
-        uxt: Box::new(uxt.clone()),
+    // construct submit_zklogin call with inner create_recovery_call
+    let create_final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin {
+        call: Box::new(create_recovery_call),
         address_seed: address_seed.clone().into(),
         zk_material: zk_material.clone(),
     };
 
     // calculate the `call_weight` & `call_weight_to_fee`
-    let call_weight = create_final_call.clone().get_dispatch_info().weight;
+    let call_weight = create_final_call.clone().get_dispatch_info().call_weight;
     let call_weight_to_fee =
         <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
 
@@ -1447,7 +1381,7 @@ fn validate_complete_recovery_flow_should_work() {
         <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
 
     // calculate the `proof_size` & `proof_size_to_fee`
-    let proof_size = uxt.clone().encode().len() as u64;
+    let proof_size = create_final_call.clone().encode().len() as u64;
     let proof_size_to_fee =
         <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(
             &frame_support::weights::Weight::from_parts(proof_size, 0),
