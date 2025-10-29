@@ -38,7 +38,7 @@ check-release:
 
 .PHONY: build build-debug build-release build-production
 build build-debug:
-	WASM_BUILD_TYPE=debug cargo build
+	WASM_BUILD_TYPE=release cargo build
 build-release:
 	WASM_BUILD_TYPE=release cargo build --release
 build-production:
