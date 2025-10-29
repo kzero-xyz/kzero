@@ -92,3 +92,19 @@ node-template = { path = "./node" }
 node-template-runtime = { path = "./runtime", default-features = false }
 pallet-zklogin = { path = "./frame/zklogin", default-features = false }
 primitive-zklogin = { path = "primitives/zklogin", default-features = false }
+
+[profile.dev]
+# Substrate runtime requires unwinding.
+panic = "unwind"
+# Higher optimization level for WASM to avoid "too many locals" error
+opt-level = 3
+
+[profile.release]
+# Substrate runtime requires unwinding.
+panic = "unwind"
+opt-level = 3
+
+[profile.production]
+codegen-units = 1
+inherits = "release"
+lto = true
