@@ -695,22 +695,8 @@ fn test_submit_jwks_unsigned() {
     let (key1, _) = ed25519::Pair::generate();
 
     // Create test JWKs
-    let jwk1 = r#"{
-        "kid": "test_key1",
-        "kty": "RSA",
-        "n": "test_n1",
-        "e": "AQAB",
-        "alg": "RS256",
-        "use": "sig"
-    }"#;
-    let jwk2 = r#"{
-        "kid": "test_key2",
-        "kty": "RSA",
-        "n": "test_n2",
-        "e": "AQAB",
-        "alg": "RS256",
-        "use": "sig"
-    }"#;
+    let jwk1 = google::GOOGLE_JWK_JSON_LIST[0];
+    let jwk2 = google::GOOGLE_JWK_JSON_LIST[1];
 
     let jwk1: Jwk = serde_json::from_str(jwk1).unwrap();
     let jwk2: Jwk = serde_json::from_str(jwk2).unwrap();
