@@ -385,20 +385,13 @@ fn validate_unsigned_should_fail_when_jwk_not_match() {
 fn test_parse_jwk_success() {
     use crate::jwk::parse_jwk;
     // Test a valid JWK
-    let valid_jwk = r#"{
-        "kid": "test_key",
-        "kty": "RSA",
-        "n": "test_n",
-        "e": "AQAB",
-        "alg": "RS256",
-        "use": "sig"
-    }"#;
+    let valid_jwk = google::GOOGLE_JWK_JSON_LIST[1];
 
     let result = parse_jwk::<Test>(valid_jwk.as_bytes());
     assert!(result.is_ok());
 
     let jwk = result.unwrap();
-    assert_eq!(jwk.prm.kid, Some("test_key".to_string()));
+    assert_eq!(jwk.prm.kid, Some("48a63bc4767f8550a532dc630cf7eb49ff397e7c".to_string()));
     assert_eq!(jwk.prm.alg, Some(primitive_zklogin::Algorithm::Signing(Signing::Rs256)));
 }
 
@@ -463,14 +456,33 @@ fn test_fetch_jwks() {
         OffchainDbExt, OffchainWorkerExt,
     };
     use sp_io::TestExternalities;
-
     // Create test externalities with offchain worker context
     let (offchain, state) = TestOffchainExt::new();
     let mut t = TestExternalities::default();
     t.register_extension(OffchainWorkerExt::new(offchain.clone()));
     t.register_extension(OffchainDbExt::new(offchain));
     // Create a valid JWK response
-    let mock_jwks_response = r#"{"keys":[{"kid":"test_key","kty":"RSA","n":"test_n","e":"AQAB","alg":"RS256","use":"sig"}]}"#;
+    let mock_jwks_response = r#"
+    {
+        "keys": [
+            {
+            "kid": "884892122e2939fd1f31375b2b363ec815723bbb",
+            "e": "AQAB",
+            "alg": "RS256",
+            "kty": "RSA",
+            "use": "sig",
+            "n": "2ftoBIWdn7XWU1XPPP0B4s-jSKq7nhHZxlT8P52l-OkhpHH8uXUJf8BG6cZFc5lRSx4p0KOjOkfTHUDrbkUOsbL8Q3DCo5z-w35-xvt2iJCe14Em-YrKUbvaRCzBln40c1m6nFf9xJ7y2hTWXFmLYERidFeWEunUbOdF7BzK1r3PJnpCaf9frNZFKh808Q7IR9S--NNIRV8WMJxXhNa0C7ZwvC_Z-arjywdXFhtgiXMQKYhwLWDPtPRQ41CYHTo2wFIh20sBSrzKawHBfloZQSc47CJk85Oz7dA3jsGGj6P00EuvZEoENzk4Czf-bl9wtehJ3xadHDjRkdWDBfhhqQ"
+            },
+            {
+            "e": "AQAB",
+            "kty": "RSA",
+            "alg": "RS256",
+            "use": "sig",
+            "kid": "b5e440ae941e9981ee2fa1376d42c46d731dee3f",
+            "n": "pZXMN1HbBD2H5iDDuaQM_1gx_B3uIStAT1qAPN6oxKID6Rp8ybt8_SdfuGNonoazOQ4OHiP3Prckr-WuEFISfjzWJkT15lBQ_hc9Wq5-eZBSuTas9yEd3a1AtT-ms_E5Re3CsuFJoO9A5g0UYcZWWbp27f06FUDo3qYvLN2JJcJTIR4Ivi6pWj2Yrm6ShtaW4Jnz5XyIr3lKzJh3uNR79081_9rfvzV5mVdvKY1mPuXJM4Bhev4f1PSAxSyAaP_c3_fUPP7rQHf0re-RT8U4nsDbIRoiGhTE3UeLC2dzMQm8s23ex0Q2EsG-cSKXTXL5Ts9rleqryYqOrEJOTxzCqw"
+            }
+        ]
+    }"#;
     let mock_config_response = r#"{"jwks_uri":"https://example.com/jwks"}"#;
 
     t.execute_with(|| {

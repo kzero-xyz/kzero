@@ -162,6 +162,7 @@ impl JwkProvider {
 }
 
 // TODO add doc and derive for this error.
+#[derive(Debug)]
 pub enum JwkProviderErr<Err> {
     Fetch(Err),
     NotFoundJwkUri,

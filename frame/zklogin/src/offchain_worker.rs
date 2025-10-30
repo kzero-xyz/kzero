@@ -251,7 +251,7 @@ pub(crate) fn fetch_jwks() -> Vec<(JwkProvider, Vec<Jwk>)> {
             }
             Err(e) => {
                 // TODO print error info based on the error type.
-                match e {
+                match &e {
                     JwkProviderErr::Fetch(e) => match e {
                         Error::Http(e) => {
                             log::error!(target: TARGET, "Http error: {:?}", e);
@@ -265,7 +265,7 @@ pub(crate) fn fetch_jwks() -> Vec<(JwkProvider, Vec<Jwk>)> {
                     JwkProviderErr::InvalidJson(_obj) => {}
                     JwkProviderErr::InvalidJwks(_obj) => {}
                 }
-                log::error!(target: TARGET, "Failed to fetch Jwks for this provider: {:?}", provider);
+                log::error!(target: TARGET, "Failed to fetch Jwks for this provider: {:?}, err:{:?}", provider, e);
                 continue;
             }
         };
@@ -292,6 +292,7 @@ fn fetch_obj(url: &str) -> Result<serde_json::Value, Error> {
     Ok(obj)
 }
 
+#[derive(Debug)]
 enum Error {
     Http(http::Error),
     Serde(serde_json::Error),
