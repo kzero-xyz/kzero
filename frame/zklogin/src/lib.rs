@@ -128,13 +128,10 @@ pub mod pallet {
 
     /// The current set of keys that may submit an offchain extrinsic.
     #[pallet::storage]
-    // TODO we need more code to bond `T::Public: MaxEncodedLen`, then we can remove `#[pallet::unbounded]`.
-    #[pallet::unbounded]
     pub type Keys<T: Config> = StorageValue<_, WeakBoundedVec<T::Public, T::MaxKeys>, ValueQuery>;
 
     /// The on-chain Jwk JSONs, indexed by (provider, kid).
     #[pallet::storage]
-    #[pallet::unbounded]
     pub(crate) type JwkJsons<T: Config> = StorageDoubleMap<
         _,
         Twox64Concat,
