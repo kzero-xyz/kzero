@@ -19,6 +19,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentifyAccount, SaturatedConversion, Verify},
     BuildStorage, MultiAddress, MultiSignature,
 };
+use sp_runtime::traits::TransactionExtension;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -218,10 +219,11 @@ const INIT_BALANCE: u64 = 1_000_000_000_000_000;
 // our desired mockup.
 pub fn new_test_ext() -> sp_io::TestExternalities {
     let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+    let addr = zk_address();
     // We use default for brevity, but you can configure as desired if needed.
     pallet_balances::GenesisConfig::<Test> {
         // give `zk_address` an initial value of INIT_BALANCE
-        balances: vec![(zk_address(), INIT_BALANCE)],
+        balances: vec![(addr, INIT_BALANCE)],
         ..Default::default()
     }
     .assimilate_storage(&mut t)
@@ -760,7 +762,11 @@ fn test_submit_zklogin() {
     let call: RuntimeCall =
         BalancesCall::transfer_keep_alive { dest: MultiAddress::Id(dest.clone()), value: 100 }
             .into();
-
+    let final_call: RuntimeCall = ZkLoginCall::submit_zklogin {
+        call: Box::new(call.clone()),
+        address_seed: address_seed.into(),
+        zk_material,
+    }.into();
     // Create signed payload
     let signing_key: ed25519::Pair = get_test_eph_key();
     let tx_ext: TxExtension = (
@@ -769,22 +775,15 @@ fn test_submit_zklogin() {
         frame_system::CheckWeight::<Test>::new(),
         pallet_transaction_payment::ChargeTransactionPayment::from(0),
     );
-    let inner_payload =
-        SignedPayload::new(call.clone(), tx_ext.clone()).expect("payload should succeed");
-    let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
+    let inner_sign = SignedPayload::new(final_call.clone(), tx_ext.clone()).expect("payload should succeed").using_encoded(|d| signing_key.sign(d));
 
     // Create unchecked extrinsic
     let uxt = MockUncheckedExtrinsic::new_signed(
-        call.clone(),
+        final_call.clone(),
         AccountId::from(signing_key.public()).into(),
         MultiSignature::from(inner_sign),
         tx_ext.clone(),
     );
-    let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin {
-        call: Box::new(call.clone()),
-        address_seed: address_seed.into(),
-        zk_material,
-    };
 
     // call_weight & call_weight_to_fee
     let call_weight = call.clone().get_dispatch_info().call_weight;
@@ -806,7 +805,10 @@ fn test_submit_zklogin() {
             &frame_support::weights::Weight::from_parts(proof_size, 0),
         );
 
-    let total_fee = call_weight_to_fee + base_weight_to_fee + proof_size_to_fee;
+    let extension_weight = tx_ext.weight(&final_call);
+    let extension_weight_weight_to_fee =
+        <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&extension_weight);
+    let total_fee = call_weight_to_fee + base_weight_to_fee + proof_size_to_fee + extension_weight_weight_to_fee;
 
     new_test_ext().execute_with(|| {
         // Set jwk from root
@@ -815,18 +817,13 @@ fn test_submit_zklogin() {
         // Set block number to ensure key is not expired
         System::set_block_number(10);
 
-        // Test successful submission
-        assert_ok!(final_call.clone().dispatch_bypass_filter(RawOrigin::None.into()));
+        // Test successful execution
+        let result = MockExecutive::apply_extrinsic(uxt).unwrap();
+        assert_ok!(result);
 
         // Verify transfer was successful
         assert_eq!(Balances::free_balance(&dest), 100);
         assert_eq!(Balances::free_balance(&zk_address()), INIT_BALANCE - total_fee - 100);
-
-        // Test invalid origin (must be None)
-        assert_noop!(
-            final_call.clone().dispatch_bypass_filter(RawOrigin::Root.into()),
-            DispatchError::BadOrigin
-        );
     });
 }
 
@@ -922,7 +919,12 @@ fn should_weight_the_same() {
                 jwks.as_bytes().to_vec()
             ));
             let signing_key: ed25519::Pair = get_test_eph_key();
-            // construct UnsignedExtrinsic using `TxExtension`
+            let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin {
+                call: Box::new(sys_remark_call.clone()),
+                address_seed: address_seed.clone().into(),
+                zk_material,
+            };
+            // construct signed extrinsic using `TxExtension`
             let tx_ext: TxExtension = (
                 super::ZkLoginExtension::<Test>::new(),
                 frame_system::CheckNonce::<Test>::from(0),
@@ -930,27 +932,15 @@ fn should_weight_the_same() {
                 pallet_transaction_payment::ChargeTransactionPayment::from(0),
             );
             let inner_payload =
-                SignedPayload::new(sys_remark_call.clone(), tx_ext.clone())
+                SignedPayload::new(final_call.clone().into(), tx_ext.clone())
                     .expect("payload should succeed");
             let inner_sign = inner_payload.using_encoded(|d| signing_key.sign(d));
             let uxt = MockUncheckedExtrinsic::new_signed(
-                sys_remark_call.clone(),
+                final_call.clone().into(),
                 AccountId::from(signing_key.public()).into(),
                 MultiSignature::from(inner_sign),
                 tx_ext.clone(),
             );
-            let final_call: ZkLoginCall<Test> = ZkLoginCall::submit_zklogin {
-                call: Box::new(sys_remark_call.clone()),
-                address_seed: address_seed.clone().into(),
-                zk_material,
-            };
-            // construct outer UncheckedExtrinsic using `TxExtension``
-            let outer_uxt = UncheckedExtrinsic::<
-                MultiAddress<AccountId, ()>,
-                RuntimeCall,
-                MultiSignature,
-                TxExtension,
-            >::new_unsigned(final_call.clone().into());
             assert_ok!(ZkLogin::set_jwk(
                 RawOrigin::Root.into(),
                 provider,
@@ -964,7 +954,7 @@ fn should_weight_the_same() {
 
             // Record BlockWeight before execution
             // execute through `apply_extrinsic`
-            assert_ok!(MockExecutive::apply_extrinsic(outer_uxt));
+            assert_ok!(MockExecutive::apply_extrinsic(uxt));
 
             let block_weight_after = frame_system::BlockWeight::<Test>::get();
             let delta = block_weight_after.total().saturating_sub(block_weight_before.total());
