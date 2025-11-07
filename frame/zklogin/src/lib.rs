@@ -395,7 +395,10 @@ pub mod pallet {
                         .propagate(true)
                         .build()
                 }
-                _ => Err(InvalidTransaction::Call.into()),
+                _ => {
+                    log::info!("validate_unsigned: invalid call: {:?}", call);
+                    Err(InvalidTransaction::Call.into())
+                }
             }
         }
     }
