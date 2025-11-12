@@ -23,7 +23,7 @@ ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", rev = "42b38f167
 ark-relations = { version = "0.4.0", default-features = false }
 ff = { version = "0.13.0", default-features = false, features = ["derive"] }
 num-bigint = { version = "0.4.4", default-features = false }
-poseidon-ark = { git = "https://github.com/dejavukong/poseidon-ark", branch = "no-std", default-features = false }
+poseidon-ark-no-std = { version = "0.0.1", default-features = false }
 
 # substrate
 sp-core = { workspace = true }
@@ -61,7 +61,7 @@ std = [
     "ark-relations/std",
     "ff/std",
     "ark-ff/std",
-    "poseidon-ark/std",
+    "poseidon-ark-no-std/std",
     "num-bigint/std",
     # substrate
     "sp-runtime/std",
