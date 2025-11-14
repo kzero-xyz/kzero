@@ -3,6 +3,8 @@
 //! Mainly about `zklogin_verify`
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 
 use crate::{
     pvk::{prod_pvk, test_pvk},
@@ -30,7 +32,7 @@ mod pvk;
 mod utils;
 mod zk_input;
 // public mod
-#[cfg(feature = "testing")]
+#[cfg(any(feature = "testing", feature = "runtime-benchmarks"))]
 pub mod test_helper;
 #[cfg(all(feature = "testing", test))]
 mod tests;

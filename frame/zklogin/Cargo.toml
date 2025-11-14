@@ -27,10 +27,10 @@ sp-std = { workspace = true, default-features = false }
 # zkloign
 primitive-zklogin = { workspace = true, default-features = false }
 # benchmark
-# frame-benchmarking = { workspace = true, default-features = false }
-# hex = { version = "0.4.3", default-features = false }
-# pallet-transaction-payment = { workspace = true, default-features = false }
-# pallet-balances = { workspace = true, default-features = false }
+frame-benchmarking = { workspace = true, default-features = false, optional = true }
+pallet-transaction-payment = { workspace = true, default-features = false, optional = true }
+pallet-balances = { workspace = true, default-features = false, optional = true }
+num-bigint = { version = "0.4.4", default-features = false, optional = true }
 
 [dev-dependencies]
 frame-benchmarking = { workspace = true, features = ["std"] }
@@ -67,7 +67,10 @@ std = [
 runtime-benchmarks = [
     "sp-runtime/runtime-benchmarks",
     "primitive-zklogin/runtime-benchmarks",
-
+    "frame-benchmarking/runtime-benchmarks",
+    "pallet-transaction-payment/runtime-benchmarks",
+    "pallet-balances/runtime-benchmarks",
+    "num-bigint",
 ]
 try-runtime = [
     "frame-support/try-runtime",

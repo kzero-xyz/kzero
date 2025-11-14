@@ -7,17 +7,26 @@ use crate::{
 };
 use ark_ff::Zero;
 use num_bigint::BigUint;
+#[cfg(feature = "testing")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "testing")]
 use serde_json;
 use sp_core::{ed25519::Pair as Ed25519Pair, Pair, H256, U256};
-use std::str::FromStr;
+use sp_std::{prelude::*, str::FromStr};
+
+// String and Vec types for no_std environment
+#[cfg(not(feature = "std"))]
+use alloc::{string::String, string::ToString, vec::Vec};
 
 const MAX_KEY_CLAIM_NAME_LENGTH: u8 = 32;
 const MAX_KEY_CLAIM_VALUE_LENGTH: u8 = 115;
 const MAX_AUD_VALUE_LENGTH: u8 = 145;
 
+#[cfg(feature = "testing")]
 type CircomG1Json = [String; 3];
+#[cfg(feature = "testing")]
 type CircomG2Json = [[String; 2]; 3];
+#[cfg(feature = "testing")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZkLoginProofJson {
     pub(crate) a: CircomG1Json,
@@ -25,12 +34,14 @@ pub struct ZkLoginProofJson {
     pub(crate) c: CircomG1Json,
 }
 
+#[cfg(feature = "testing")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaimJson {
     value: String,
     index_mod_4: u8,
 }
 
+#[cfg(feature = "testing")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZkLoginInputsReaderJson {
     pub(crate) proof_points: ZkLoginProofJson,
@@ -38,6 +49,7 @@ pub struct ZkLoginInputsReaderJson {
     pub(crate) header: String,
 }
 
+#[cfg(feature = "testing")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZkLoginInputsReader {
     pub(crate) proof_points: ZkLoginProof,
@@ -45,12 +57,14 @@ pub struct ZkLoginInputsReader {
     pub(crate) header: U256,
 }
 
+#[cfg(feature = "testing")]
 impl From<ClaimJson> for Claim {
     fn from(value: ClaimJson) -> Self {
         Self { value: U256::from_dec_str(&value.value).expect(""), index_mod_4: value.index_mod_4 }
     }
 }
 
+#[cfg(feature = "testing")]
 impl From<ZkLoginProofJson> for ZkLoginProof {
     fn from(value: ZkLoginProofJson) -> Self {
         let convert = |s: &str| -> BigNumber {
@@ -69,6 +83,7 @@ impl From<ZkLoginProofJson> for ZkLoginProof {
     }
 }
 
+#[cfg(feature = "testing")]
 impl From<ZkLoginInputsReaderJson> for ZkLoginInputsReader {
     fn from(value: ZkLoginInputsReaderJson) -> Self {
         Self {
@@ -79,6 +94,7 @@ impl From<ZkLoginInputsReaderJson> for ZkLoginInputsReader {
     }
 }
 
+#[cfg(feature = "testing")]
 impl ZkLoginInputs {
     pub fn from_json(value: &str) -> Result<Self, String> {
         let reader: ZkLoginInputsReaderJson =
@@ -96,13 +112,13 @@ impl ZkLoginInputs {
     }
 }
 
-fn gen_address_seed(
+pub fn gen_address_seed(
     salt: &str,
     name: &str,  // i.e. "sub"
     value: &str, // i.e. the sub value
     aud: &str,   // i.e. the client ID
 ) -> ZkAuthResult<String> {
-    let salt_hash = poseidon_zk_login(vec![to_field(salt)?])?;
+    let salt_hash = poseidon_zk_login(sp_std::vec![to_field(salt)?])?;
     gen_address_seed_with_salt_hash(&salt_hash.to_string(), name, value, aud)
 }
 
@@ -178,7 +194,7 @@ fn gen_address_seed_with_salt_hash(
     value: &str, // i.e. the sub value
     aud: &str,   // i.e. the client ID
 ) -> ZkAuthResult<String> {
-    Ok(poseidon_zk_login(vec![
+    Ok(poseidon_zk_login(sp_std::vec![
         hash_ascii_str_to_field(name, MAX_KEY_CLAIM_NAME_LENGTH)?,
         hash_ascii_str_to_field(value, MAX_KEY_CLAIM_VALUE_LENGTH)?,
         hash_ascii_str_to_field(aud, MAX_AUD_VALUE_LENGTH)?,
@@ -251,6 +267,7 @@ pub fn get_raw_data() -> (H256, String, u64, [u8; 32]) {
     (address_seed, proof_data.to_owned(), max_epoch, eph_pubkey_bytes)
 }
 
+#[cfg(feature = "testing")]
 pub fn get_zklogin_inputs(proof_data: String) -> ZkLoginInputs {
     let input = ZkLoginInputs::from_json(&proof_data).expect("wrong json parse");
     input
@@ -258,6 +275,8 @@ pub fn get_zklogin_inputs(proof_data: String) -> ZkLoginInputs {
 
 pub mod test_cases {
     use crate::{jwk_from_slice, Jwk, Kid};
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
     pub mod google {
         use super::*;
         pub const GOOGLE_JWK_JSON_LIST: [&str; 2] = [
