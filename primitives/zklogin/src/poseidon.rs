@@ -1,6 +1,6 @@
 use crate::error::{ZkAuthError, ZkAuthResult};
 use ark_bn254::Fr;
-use poseidon_ark::Poseidon;
+use poseidon_ark_no_std::Poseidon;
 use sp_std::vec::Vec;
 
 /// The degree of the Merkle tree used to hash multiple elements.

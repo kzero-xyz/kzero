@@ -166,10 +166,10 @@ impl frame_system::offchain::CreateSignedTransaction<super::Call<Test>> for Test
     ) -> Option<MockUncheckedExtrinsic> {
         use sp_runtime::traits::StaticLookup;
         let tip = 0;
-        let period =
+        let _period =
             BlockHashCount::get().checked_next_power_of_two().map(|c| c / 2).unwrap_or(2) as u64;
         let current_block = System::block_number().saturated_into::<u64>().saturating_sub(1);
-        let era = sp_runtime::generic::Era::mortal(period, current_block);
+        let _era = sp_runtime::generic::Era::mortal(_period, current_block);
         let tx_ext = (
             super::ZkLoginExtension::<Test>::new(),
             frame_system::CheckNonce::<Test>::from(nonce),
@@ -206,6 +206,10 @@ impl crate::weights::WeightInfo for () {
     fn set_jwk() -> frame_support::weights::Weight {
         frame_support::weights::Weight::zero()
     }
+    
+    fn submit_zklogin() -> frame_support::weights::Weight {
+        frame_support::weights::Weight::zero()
+    }
 }
 
 fn zk_address() -> AccountId {
@@ -239,150 +243,150 @@ fn basic_setup_works() {
 }
 
 // ================================ validate_unsigned ================================
-/*
+
 #[test]
 fn validate_unsigned_should_work() {
+    use crate::JwksPayload;
     use sp_runtime::traits::ValidateUnsigned;
-    let source = sp_runtime::transaction_validity::TransactionSource::External;
-
-    // get zk-related variables for zk-proof verifying
-    let (address_seed, input_data, expire_at, _) = get_raw_data();
-    let inputs = get_zklogin_inputs(input_data);
-
-    let signing_key: ed25519::Pair = get_test_eph_key();
-
+    use sp_runtime::{MultiSigner, transaction_validity::TransactionSource};
+    use sp_core::sr25519;
+    
+    let source = TransactionSource::External;
     let provider = JwkProvider::Google;
-    let jwks = google::GOOGLE_JWK_JSON_LIST[0];
-    let kids = google::kids(true);
-    let kid = kids[0].clone();
-
-    let zk_material = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
-
-    // construct Transfer Call
-    let dest = AccountId::from([0u8; 32]);
-    let call: RuntimeCall =
-        BalancesCall::transfer_keep_alive { dest: MultiAddress::Id(dest.clone()), value: 100 }
-            .into();
-
-    // construct submit_zklogin call with inner call
-    let final_call = ZkLoginCall::submit_zklogin {
-        call: Box::new(call.clone()),
-        address_seed: address_seed.into(),
-        zk_material,
-    };
-
-    // construct outer UncheckedExtrinsic using `TxExtension``
-    let outer_uxt = UncheckedExtrinsic::<
-        MultiAddress<AccountId, ()>,
-        RuntimeCall,
-        MultiSignature,
-        TxExtension,
-    >::new_unsigned(final_call.clone().into());
-
-    // calculate the call_weight & call_weight_to_fee
-    let call_weight = call.clone().get_dispatch_info().call_weight;
-    let call_weight_to_fee =
-        <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&call_weight);
-
-    // calculate the base weight & weight_to_fee
-    let block_weights: frame_system::limits::BlockWeights =
-        <Test as frame_system::Config>::BlockWeights::get();
-    let base_extrinsic =
-        block_weights.get(frame_support::dispatch::DispatchClass::Normal).base_extrinsic;
-    let base_weight_to_fee =
-        <Test as pallet_transaction_payment::Config>::WeightToFee::weight_to_fee(&base_extrinsic);
-
-    // calculate the proof_size & proof_size_to_fee
-    let proof_size = outer_uxt.encode().len() as u64;
-    let proof_size_to_fee =
-        <Test as pallet_transaction_payment::Config>::LengthToFee::weight_to_fee(
-            &frame_support::weights::Weight::from_parts(proof_size, 0),
-        );
-
-    // calculate `the total fee` = `call_weight_to_fee` + `base_weight_to_fee` + `proof_size_to_fee`
-    let total_fee = call_weight_to_fee + base_weight_to_fee + proof_size_to_fee;
-
+    let jwk_json = google::GOOGLE_JWK_JSON_LIST[0];
+    
     new_test_ext().execute_with(|| {
-        // Set jwk from root.
-        assert_ok!(ZkLogin::set_jwk(RawOrigin::Root.into(), provider, jwks.as_bytes().to_vec()));
-
-        // the eph key's expiration at 834, make sure current number is smaller.
+        // Set log level to off to suppress error messages
+        log::set_max_level(log::LevelFilter::Off);
+        
+        // Generate test key using sr25519 (AuthorityId uses sr25519)
+        let (key, _) = sr25519::Pair::generate();
+        let public = MultiSigner::Sr25519(key.public());
+        assert_ok!(ZkLogin::update_keys(
+            RawOrigin::Root.into(),
+            vec![(public.clone(), true)]
+        ));
+        
+        // Set block number
         System::set_block_number(10);
-
-        // check the balance of zk_address before the transfer
-        let balance_before = Balances::free_balance(&zk_address());
-        assert_eq!(balance_before, INIT_BALANCE);
-
-        // validate the unsigned extrinsic
-        assert!(Pallet::<Test>::validate_unsigned(source, &final_call).is_ok());
-
-        // execute through call.dispatch
-        assert_ok!(final_call.dispatch_bypass_filter(RawOrigin::None.into()));
-        let balance_after = Balances::free_balance(&zk_address());
-
-        // check the balance of zk_address after the transfer (should deduct the `fee` and `the transfer amount``)
-        assert_eq!(balance_after, INIT_BALANCE - total_fee - 100);
-
-        // transfer success, check the balance of the destination account should be 100
-        assert_eq!(Balances::free_balance(&dest), 100);
-
-        // About to do the second transfer by apply_extrinsic
-        // execute through `apply_extrinsic`
-        assert_ok!(MockExecutive::apply_extrinsic(outer_uxt));
-
-        let balance_after_apply_extrinsic = Balances::free_balance(&zk_address());
-
-        // check the balance of zk_address after the transfer (should deduct the `fee` and `the transfer amount``)
-        assert_eq!(balance_after_apply_extrinsic, balance_after - total_fee - 100);
-
-        // transfer success, check the balance of the destination account should be 200(two times of the transfer)
-        assert_eq!(Balances::free_balance(&dest), 200);
+        
+        // Create payload with new JWK (not on chain)
+        let jwk_json_vec = jwk_json.as_bytes().to_vec();
+        let payload = JwksPayload {
+            public: public.clone(),
+            jwks: vec![(provider, vec![jwk_json_vec])],
+            block_number: 10,
+        };
+        
+        // Sign the payload using sr25519
+        let signature = sp_runtime::MultiSignature::Sr25519(key.sign(&payload.encode()));
+        
+        // Create the call
+        let call = ZkLoginCall::submit_jwks_unsigned {
+            payload: payload.clone(),
+            signature: signature.clone(),
+        };
+        
+        // Validate the unsigned extrinsic - should succeed
+        assert!(Pallet::<Test>::validate_unsigned(source, &call).is_ok());
     });
 }
 
 #[test]
-fn validate_unsigned_should_fail_when_jwk_not_match() {
+fn validate_unsigned_should_fail_when_signature_invalid() {
+    use crate::JwksPayload;
     use sp_runtime::traits::ValidateUnsigned;
-    let source = sp_runtime::transaction_validity::TransactionSource::External;
-
-    // get zk-related variables for zk-proof verifying
-    let (address_seed, input_data, expire_at, _) = get_raw_data();
-    let inputs = get_zklogin_inputs(input_data);
-    let signing_key: ed25519::Pair = get_test_eph_key();
+    use sp_runtime::{MultiSigner, transaction_validity::TransactionSource};
+    use sp_core::sr25519;
+    
+    let source = TransactionSource::External;
     let provider = JwkProvider::Google;
-
-    // use the second jwk, which is not corresponding to the jwk in the zkMaterial
-    let jwks = google::GOOGLE_JWK_JSON_LIST[1];
-    let kids = google::kids(true);
-    let kid = kids[0].clone();
-
-    let zk_material = ZkMaterialV1::new(provider, kid, inputs, expire_at).into();
-
-    // construct Transfer Call
-    let dest = AccountId::from([0u8; 32]);
-    let call: RuntimeCall =
-        BalancesCall::transfer_keep_alive { dest: MultiAddress::Id(dest.clone()), value: 100 }
-            .into();
-
-    // construct submit_zklogin call with inner call
-    let final_call = ZkLoginCall::submit_zklogin {
-        call: Box::new(call),
-        address_seed: address_seed.into(),
-        zk_material,
-    };
-
+    let jwk_json = google::GOOGLE_JWK_JSON_LIST[0];
+    
     new_test_ext().execute_with(|| {
-        // Set jwk from root.
-        assert_ok!(ZkLogin::set_jwk(RawOrigin::Root.into(), provider, jwks.as_bytes().to_vec()));
-
-        // the eph key's expiration at 834, make sure current number is smaller.
+        // Set log level to off to suppress error messages
+        log::set_max_level(log::LevelFilter::Off);
+        
+        // Generate test key and add it to the keys list
+        let (key, _) = sr25519::Pair::generate();
+        let public = MultiSigner::Sr25519(key.public());
+        assert_ok!(ZkLogin::update_keys(
+            RawOrigin::Root.into(),
+            vec![(public.clone(), true)]
+        ));
+        
+        // Generate a different key for invalid signature
+        let (wrong_key, _) = sr25519::Pair::generate();
+        
+        // Set block number
         System::set_block_number(10);
-
-        // The JWK is not matched, so the validation should fail.
-        assert!(Pallet::<Test>::validate_unsigned(source, &final_call).is_err());
+        
+        // Create payload
+        let jwk_json_vec = jwk_json.as_bytes().to_vec();
+        let payload = JwksPayload {
+            public: public.clone(),
+            jwks: vec![(provider, vec![jwk_json_vec])],
+            block_number: 10,
+        };
+        
+        // Sign with wrong key - invalid signature
+        let invalid_signature = sp_runtime::MultiSignature::Sr25519(wrong_key.sign(&payload.encode()));
+        
+        // Create the call with invalid signature
+        let call = ZkLoginCall::submit_jwks_unsigned {
+            payload: payload.clone(),
+            signature: invalid_signature,
+        };
+        
+        // Validate the unsigned extrinsic - should fail due to invalid signature
+        assert!(Pallet::<Test>::validate_unsigned(source, &call).is_err());
     });
 }
-*/
+
+#[test]
+fn validate_unsigned_should_fail_when_key_not_authorized() {
+    use crate::JwksPayload;
+    use sp_runtime::traits::ValidateUnsigned;
+    use sp_runtime::{MultiSigner, transaction_validity::TransactionSource};
+    use sp_core::sr25519;
+    
+    let source = TransactionSource::External;
+    let provider = JwkProvider::Google;
+    let jwk_json = google::GOOGLE_JWK_JSON_LIST[0];
+    
+    new_test_ext().execute_with(|| {
+        // Set log level to off to suppress error messages
+        log::set_max_level(log::LevelFilter::Off);
+        
+        // Generate test key but DON'T add it to the keys list
+        let (key, _) = sr25519::Pair::generate();
+        let public = MultiSigner::Sr25519(key.public());
+        
+        // Set block number
+        System::set_block_number(10);
+        
+        // Create payload
+        let jwk_json_vec = jwk_json.as_bytes().to_vec();
+        let payload = JwksPayload {
+            public: public.clone(),
+            jwks: vec![(provider, vec![jwk_json_vec])],
+            block_number: 10,
+        };
+        
+        // Sign the payload
+        let signature = sp_runtime::MultiSignature::Sr25519(key.sign(&payload.encode()));
+        
+        // Create the call
+        let call = ZkLoginCall::submit_jwks_unsigned {
+            payload: payload.clone(),
+            signature: signature.clone(),
+        };
+        
+        // Validate the unsigned extrinsic - should fail because key is not authorized
+        assert!(Pallet::<Test>::validate_unsigned(source, &call).is_err());
+    });
+}
+
 // ================================ jwk parse tests ================================
 #[test]
 fn test_parse_jwk_success() {
@@ -744,9 +748,7 @@ fn test_submit_jwks_unsigned() {
 // ================================ submit_zklogin test ================================
 #[test]
 fn test_submit_zklogin() {
-    use frame_support::assert_noop;
     use primitive_zklogin::{JwkProvider, ZkMaterialV1};
-    use sp_runtime::DispatchError;
     log::set_max_level(log::LevelFilter::Off);
 
     // Get test data
@@ -833,8 +835,6 @@ fn validate_add_proxy_should_work() {
     // get zk-related variables for zk-proof verifying
     let (address_seed, input_data, expire_at, _) = get_raw_data();
     let inputs = get_zklogin_inputs(input_data);
-
-    let signing_key: ed25519::Pair = get_test_eph_key();
 
     let provider = JwkProvider::Google;
     let jwks = google::GOOGLE_JWK_JSON_LIST[0];
@@ -1381,12 +1381,3 @@ fn validate_complete_recovery_flow_should_work() {
     });
 }
 
-fn header_from_number(n: u32) -> sp_runtime::generic::Header<u32, BlakeTwo256> {
-    sp_runtime::generic::Header {
-        number: n,
-        parent_hash: Default::default(),
-        extrinsics_root: Default::default(),
-        state_root: Default::default(),
-        digest: Default::default(),
-    }
-}

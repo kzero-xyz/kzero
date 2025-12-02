@@ -10,10 +10,9 @@ use sc_cli::Result;
 use sc_client_api::BlockBackend;
 use sp_core::{Encode, Pair};
 use sp_inherents::{InherentData, InherentDataProvider};
-use sp_runtime::OpaqueExtrinsic;
+use sp_runtime::{traits::SaturatedConversion, OpaqueExtrinsic};
 
 use primitive_zklogin::test_helper::{get_raw_data, get_test_eph_key, get_zklogin_inputs};
-use sp_runtime::generic::Era;
 use std::{sync::Arc, time::Duration};
 
 /// Generates extrinsics for the `benchmark overhead` command.
@@ -103,34 +102,25 @@ pub fn create_zklogin_benchmark_extrinsic(
     call: runtime::RuntimeCall,
     nonce: u32,
 ) -> runtime::UncheckedExtrinsic {
-    let genesis_hash = client.block_hash(0).ok().flatten().expect("Genesis block exists; qed");
-    let best_hash = client.chain_info().best_hash;
+    let period =
+		runtime::BlockHashCount::get().checked_next_power_of_two().map(|c| c / 2).unwrap_or(2) as u64;
+	let best_block = client.chain_info().best_number;
+	let era = sp_runtime::generic::Era::mortal(period, best_block.saturated_into());
 
-    let extra: runtime::SignedExtra = (
-        frame_system::CheckNonZeroSender::<runtime::Runtime>::new(),
-        frame_system::CheckSpecVersion::<runtime::Runtime>::new(),
-        frame_system::CheckTxVersion::<runtime::Runtime>::new(),
-        frame_system::CheckGenesis::<runtime::Runtime>::new(),
-        frame_system::CheckEra::<runtime::Runtime>::from(Era::immortal()),
-        frame_system::CheckNonce::<runtime::Runtime>::from(nonce),
-        frame_system::CheckWeight::<runtime::Runtime>::new(),
-        pallet_transaction_payment::ChargeTransactionPayment::<runtime::Runtime>::from(0),
-    );
+	let tx_ext: runtime::TxExtension = (
+		frame_system::CheckNonZeroSender::<runtime::Runtime>::new(),
+		frame_system::CheckSpecVersion::<runtime::Runtime>::new(),
+		frame_system::CheckTxVersion::<runtime::Runtime>::new(),
+		frame_system::CheckGenesis::<runtime::Runtime>::new(),
+		frame_system::CheckEra::<runtime::Runtime>::from(era),
+		pallet_zklogin::ZkLoginExtension::<runtime::Runtime>::new(),
+		frame_system::CheckNonce::<runtime::Runtime>::from(nonce),
+		frame_system::CheckWeight::<runtime::Runtime>::new(),
+		pallet_transaction_payment::ChargeTransactionPayment::<runtime::Runtime>::from(0),
+	);
 
-    let raw_payload = runtime::SignedPayload::from_raw(
-        call.clone(),
-        extra.clone(),
-        (
-            (),
-            runtime::VERSION.spec_version,
-            runtime::VERSION.transaction_version,
-            genesis_hash,
-            best_hash,
-            (),
-            (),
-            (),
-        ),
-    );
+	let raw_payload = runtime::SignedPayload::new(call.clone(), tx_ext.clone())
+		.expect("Failed to create signed payload");
 
     let _signature = raw_payload.using_encoded(|e| eph_signer.sign(e));
 

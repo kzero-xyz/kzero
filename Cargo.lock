@@ -5821,6 +5821,7 @@ dependencies = [
  "node-template-runtime",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc",
+ "pallet-zklogin",
  "primitive-zklogin",
  "sc-basic-authorship",
  "sc-cli",
@@ -6359,6 +6360,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "log",
+ "num-bigint 0.4.4",
  "pallet-balances",
  "pallet-proxy",
  "pallet-recovery",
@@ -7019,9 +7021,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f84267b20a16ea918e43c6a88433c2d54fa145c92a811b5b047ccbe153674483"
 
 [[package]]
-name = "poseidon-ark"
+name = "poseidon-ark-no-std"
 version = "0.0.1"
-source = "git+https://github.com/dejavukong/poseidon-ark?branch=no-std#281ce052f2596810301718decf6a724f34df9da5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55fb5aa5b943b364674a2ad8b96ea945fe75d57dcbf4fd485448df1c9aabe72c"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.4.2",
@@ -7113,7 +7116,7 @@ dependencies = [
  "jose-jwk",
  "num-bigint 0.4.4",
  "parity-scale-codec",
- "poseidon-ark",
+ "poseidon-ark-no-std",
  "rand 0.8.5",
  "scale-info",
  "serde",

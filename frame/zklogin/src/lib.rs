@@ -205,8 +205,8 @@ pub mod pallet {
         #[pallet::weight({
             let dispatch_info = call.get_dispatch_info();
             // TODO: provide a valid weight
-            // T::WeightInfo::submit_zklogin().saturating_add(dispatch_info.call_weight)
-            (dispatch_info.call_weight, dispatch_info.class)
+            T::WeightInfo::submit_zklogin().saturating_add(dispatch_info.call_weight)
+            // (dispatch_info.call_weight, dispatch_info.class)
         })]
         pub fn submit_zklogin(
             origin: OriginFor<T>,
@@ -499,9 +499,12 @@ where
 
     type Pre = Val;
 
-    fn weight(&self, _call: &<T as Config>::RuntimeCall) -> Weight {
-        // TODO change weight value to a proper one, banchmarks for calculate the validation of zk proof
-        Weight::from_parts(1_000, 0)
+    fn weight(&self, call: &<T as Config>::RuntimeCall) -> Weight {
+        // Only calculate the weight of the zklogin call, other calls return 0 weight.
+        match <<T as Config>::RuntimeCall as IsSubType<Call<T>>>::is_sub_type(call) {
+            Some(Call::submit_zklogin { .. }) => T::WeightInfo::submit_zklogin(),
+            _ =>  Weight::from_parts(0, 0),
+        }
     }
 
     fn validate(

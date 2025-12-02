@@ -37,6 +37,7 @@ pub trait WeightInfo {
     fn submit_jwks_unsigned(c: u32) -> Weight;
     fn update_keys(c: u32) -> Weight;
     fn set_jwk() -> Weight;
+	fn submit_zklogin() -> Weight;
 }
 
 /// Weight functions for `pallet_zklogin`.
@@ -91,5 +92,14 @@ impl<T: frame_system::Config> crate::WeightInfo for SubstrateWeight<T> {
 		Weight::from_parts(11_000_000, 0)
 			.saturating_add(Weight::from_parts(0, 0))
 			.saturating_add(T::DbWeight::get().writes(1))
+	}
+	
+	fn submit_zklogin() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 31_000_000 picoseconds.
+		Weight::from_parts(37_000_000, 0)
+			.saturating_add(Weight::from_parts(0, 0))
 	}
 }
